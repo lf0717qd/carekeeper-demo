@@ -2,6 +2,8 @@
 
 一个可点击的「居家健康智能体」演示：老人端只留一个“按一下讲嘢”的按钮，后端展示 Agent 怎么听、怎么想、怎么做、怎么兜底。
 
+![preview](preview.png)
+
 ## 在线 Demo
 
 https://lf0717qd.github.io/carekeeper-demo/
