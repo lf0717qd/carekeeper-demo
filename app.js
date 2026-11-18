@@ -397,12 +397,30 @@
     notifyFamily("婆婆报告漏服一次（" + meal + "），已转药师确认，未建议自行补服。");
   }
 
+  async function askBPMissingReading() {
+    addTrace({ tool: "triage.bp_rule", title: "血压读数缺失", detail: "先问具体读数 + 红线症状；不默认 180/100", tone: "warm" });
+    setStage("decide");
+    await agentReply(
+      "婆婆，你有冇量到具体读数？几多／几多？有冇头痛、胸痛、唞唔到气、睇嘢模糊？",
+      {
+        options: [
+          { label: "我量到 180/100", action: () => startScenario("bp", "今日血压 180/100。") },
+          { label: "我未量", action: () => agentReply("好，你先坐低休息五分钟，再量一次。量完同我讲几多／几多。如果期间胸痛、唞唔到气，立即同我讲。") },
+          { label: "有胸痛/气促", action: () => runEmergency(true) }
+        ]
+      }
+    );
+  }
+
   async function runBP() {
     const match = state.lastUserText.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/);
-    const systolic = match ? match[1] : "180";
-    const diastolic = match ? match[2] : "100";
+    if (!match) {
+      return askBPMissingReading();
+    }
+    const systolic = match[1];
+    const diastolic = match[2];
     addTrace({ tool: "nlu.intent", title: "意图识别", detail: "血压读数咨询 · 置信度 0.94" });
-    addTrace({ tool: "memory.get_vitals", title: "读取最近读数", detail: "今日 08:40 " + systolic + "/" + diastolic + "；昨日 165/95" });
+    addTrace({ tool: "memory.get_vitals", title: "读取本次读数", detail: "本次 " + systolic + "/" + diastolic + "；不替用户编造历史读数" });
     setStage("decide");
     addTrace({ tool: "triage.red_flags", title: "红线问诊", detail: "询问胸痛、气促、神经症状、视物模糊" });
     await agentReply(
@@ -436,7 +454,7 @@
       { options: [{ label: "好", action: () => agentReply("好，我十分钟后再问你。") }] }
     );
     addTrace({ tool: "create_task", title: "创建复测任务", detail: "10 分钟后复测血压；结果写入健康档案" });
-    notifyFamily("婆婆今日血压 180/100，无伴随症状；已建议复测，暂未升级。");
+    notifyFamily("婆婆今日自述血压偏高，无伴随症状；已建议静坐复测，暂未升级。");
   }
 
   async function bpChestPain() {
@@ -517,6 +535,9 @@
   async function runUnknown() {
     if (!state.apiChecked) {
       await checkApi();
+    }
+    if (/血压高|血压升|血压又高/.test(state.lastUserText) && !/\d{2,3}\s*[\/／]\s*\d{2,3}/.test(state.lastUserText)) {
+      return askBPMissingReading();
     }
     addTrace({
       tool: "nlu.intent",
