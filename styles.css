@@ -789,6 +789,8 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
 }
 @media (max-width: 560px) {
   .page { width: calc(100% - 20px); padding-top: 14px; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .top-actions { width: 100%; }
   .brand h1 { font-size: 21px; }
   .brand-mark { width: 44px; height: 44px; border-radius: 14px; }
   .brand-copy p { font-size: 10.5px; }
@@ -891,5 +893,6 @@ body.static *, body.static *::before, body.static *::after {
   font-size: 10.5px;
   line-height: 1.5;
 }
-.offline-notice strong { color: #a34e16; }
+.offline-notice strong { color: #a34e16; flex: 0 0 auto; }
+.offline-notice span { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
 .offline-notice.hidden { display: none; }
