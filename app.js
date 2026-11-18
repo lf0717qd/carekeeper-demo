@@ -12,6 +12,7 @@
     autoSpeak: false,
     cantoneseVoice: null,
     apiOnline: false,
+    apiChecked: false,
     history: [],
     realAsr: false,
     recognition: null,
@@ -79,7 +80,7 @@
   };
 
   // ---------- rendering ----------
-  function init() {
+  async function init() {
     bindEvents();
     renderFamilyReport();
     addMessage("agent", "婆婆，你好，我系乡音健康管家。你按一下讲嘢，或者直接同我讲。今日想讲咩？");
@@ -514,6 +515,9 @@
   }
 
   async function runUnknown() {
+    if (!state.apiChecked) {
+      await checkApi();
+    }
     addTrace({
       tool: "nlu.intent",
       title: "本地意图未命中",
@@ -567,6 +571,7 @@
       const response = await fetch(apiUrl("/api/health"), { cache: "no-store" });
       const data = await response.json();
       state.apiOnline = Boolean(data.ok);
+      state.apiChecked = true;
       showOfflineNotice(!state.apiOnline);
       const status = $("#agentStatus");
       if (status) {
@@ -577,6 +582,7 @@
       }
     } catch (error) {
       state.apiOnline = false;
+      state.apiChecked = true;
       showOfflineNotice(true);
       const status = $("#agentStatus");
       if (status) status.innerHTML = '<i></i> 脚本模式';
