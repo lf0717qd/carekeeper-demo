@@ -823,7 +823,51 @@
     }
   }
 
-  function startRealRecognition() {
+  async function ensureMicPermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return { ok: false, reason: "mediaDevices-unavailable" };
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return { ok: true, reason: "granted" };
+    } catch (error) {
+      return { ok: false, reason: error.name || "unknown" };
+    }
+  }
+
+  function asrErrorMessage(reason) {
+    if (reason === "mediaDevices-unavailable") {
+      return "当前浏览器不支持麦克风权限检测，请用 Chrome/Safari 直接打开，别用微信内置浏览器。";
+    }
+    if (reason === "NotAllowedError" || reason === "SecurityError") {
+      return "麦克风被浏览器拒绝：请在地址栏/网站设置里允许麦克风，刷新后再试。";
+    }
+    if (reason === "NotFoundError" || reason === "DevicesNotFoundError") {
+      return "没有检测到麦克风，请检查手机/耳机麦克风。";
+    }
+    if (reason === "NotReadableError") {
+      return "麦克风被其他 App 占用，请关掉通话/录音 App 再试。";
+    }
+    if (reason === "service-not-allowed") {
+      return "麦克风可能已授权，但浏览器语音服务不可用：请用 Chrome/Safari 直接打开，别用微信内置浏览器；或换云 ASR。";
+    }
+    if (reason === "language-not-supported") {
+      return "当前浏览器不支持粤语识别，请换 Chrome/Safari，或换云 ASR。";
+    }
+    if (reason === "network") {
+      return "浏览器语音服务网络不通（国内网络常见），需要换云 ASR。";
+    }
+    if (reason === "audio-capture") {
+      return "没有检测到麦克风，请检查权限和设备。";
+    }
+    if (reason === "no-speech") {
+      return "未听到声音，请靠近麦克风再讲一次。";
+    }
+    return "真实语音失败：" + reason;
+  }
+
+  async function startRealRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       showToast("当前浏览器不支持真实语音，已用模拟输入");
@@ -843,10 +887,26 @@
     rec.maxAlternatives = 1;
     let finalText = "";
     let failed = false;
+    let micGranted = false;
 
     button.classList.add("listening");
+    hint.textContent = "检查麦克风授权…";
+    addTrace({ tool: "asr.permission", title: "检查麦克风", detail: "先请求 getUserMedia，区分“权限问题”和“语音服务问题" });
+    const permission = await ensureMicPermission();
+    if (!permission.ok) {
+      button.classList.remove("listening");
+      hint.textContent = "唔识字、唔识用手机，都可以讲";
+      state.realAsr = false;
+      const btn = $("#asrModeBtn");
+      if (btn) btn.textContent = "用真实语音";
+      const message = asrErrorMessage(permission.reason);
+      addTrace({ tool: "asr.permission_denied", title: "麦克风不可用", detail: permission.reason + " · " + message, tone: "danger" });
+      showToast(message);
+      return;
+    }
+    micGranted = true;
     hint.textContent = "听紧… 讲完会自动停";
-    addTrace({ tool: "asr.real", title: "真实粤语 ASR", detail: "lang=yue-Hant-HK；浏览器语音识别" });
+    addTrace({ tool: "asr.real", title: "真实粤语 ASR", detail: "麦克风已授权；lang=yue-Hant-HK" });
 
     rec.onresult = (event) => {
       let interim = "";
@@ -864,19 +924,14 @@
     rec.onerror = (event) => {
       failed = true;
       const reason = event.error || "unknown";
-      addTrace({ tool: "asr.error", title: "真实语音失败", detail: reason, tone: "warm" });
-      if (reason === "not-allowed" || reason === "service-not-allowed") {
-        showToast("麦克风未授权，已切回模拟语音");
+      const effectiveReason = (reason === "not-allowed" && micGranted) ? "service-not-allowed" : reason;
+      addTrace({ tool: "asr.error", title: "真实语音失败", detail: reason + " (micGranted=" + micGranted + ")", tone: "warm" });
+      const message = asrErrorMessage(effectiveReason);
+      showToast(message);
+      if (effectiveReason === "not-allowed" || effectiveReason === "service-not-allowed" || effectiveReason === "language-not-supported") {
         state.realAsr = false;
-        $("#asrModeBtn").textContent = "用真实语音";
-      } else if (reason === "language-not-supported") {
-        showToast("当前浏览器不支持粤语识别，已切回模拟语音");
-        state.realAsr = false;
-        $("#asrModeBtn").textContent = "用真实语音";
-      } else if (reason === "no-speech") {
-        showToast("未听到，试多次");
-      } else {
-        showToast("真实语音失败：" + reason);
+        const btn = $("#asrModeBtn");
+        if (btn) btn.textContent = "用真实语音";
       }
     };
 
