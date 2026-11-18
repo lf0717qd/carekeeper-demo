@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麦克风测试 · 乡音健康管家</title>
+<style>
+  :root { --teal:#0f4c5c; --orange:#e36414; --ink:#17323a; --muted:#6c7d80; --line:#d7e3e3; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; color:var(--ink);
+    background:radial-gradient(circle at 10% 5%,rgba(227,100,20,.10),transparent 28%),
+      radial-gradient(circle at 90% 10%,rgba(15,76,92,.12),transparent 30%),
+      linear-gradient(135deg,#faf6ed,#eef5f3); min-height:100vh; padding:24px; }
+  .wrap { max-width:760px; margin:0 auto; }
+  .card { background:#fffdf8; border:1px solid var(--line); border-radius:20px; padding:24px;
+    box-shadow:0 20px 50px rgba(20,48,55,.10); }
+  h1 { margin:0 0 4px; font-size:24px; color:var(--teal); }
+  .sub { margin:0 0 18px; font-size:12px; color:var(--muted); }
+  .env { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0 18px; }
+  .env div { background:#f4f9f7; border:1px solid #e0ebe8; border-radius:10px; padding:9px 10px; font-size:12px; }
+  .env b { color:var(--teal); }
+  .good { color:#2f6b4f; } .bad { color:#b42318; }
+  button { border:0; border-radius:999px; padding:12px 18px; font-family:inherit; font-size:14px; cursor:pointer;
+    background:var(--teal); color:#fff; }
+  button.orange { background:var(--orange); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  #meter { height:14px; background:#e7f0ee; border-radius:999px; overflow:hidden; margin:10px 0; }
+  #meter > i { display:block; height:100%; width:0%; background:linear-gradient(90deg,#1f6f7a,#e36414); transition:width .08s; }
+  audio { width:100%; margin-top:10px; }
+  pre { background:#0f2b31; color:#dff0ed; border-radius:12px; padding:12px; font-size:11px; line-height:1.6;
+    white-space:pre-wrap; word-break:break-word; min-height:80px; }
+  .note { margin-top:16px; padding:10px 12px; border-radius:10px; background:#fff7ee; border:1px solid #efd8c3;
+    color:#7a5438; font-size:11px; line-height:1.6; }
+  a { color:var(--teal); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>麦克风测试</h1>
+    <p class="sub">先确认浏览器能不能拿到麦克风，再判断是“权限问题”还是“粤语识别服务问题”。</p>
+
+    <div class="env" id="env"></div>
+
+    <div class="row">
+      <button id="start">测试麦克风（录 5 秒）</button>
+      <button id="stop" class="orange" disabled>停止</button>
+    </div>
+
+    <div id="meter"><i></i></div>
+    <audio id="playback" controls></audio>
+    <pre id="log">点“测试麦克风”开始。</pre>
+
+    <div class="note">
+      手机提示：<br>
+      · 微信内置浏览器通常不支持录音，请点右上角“在浏览器打开”。<br>
+      · iPhone：设置 → Safari → 麦克风 → 允许；或地址栏“aA” → 网站设置 → 麦克风。<br>
+      · Android Chrome：地址栏锁图标 → 权限 → 麦克风 → 允许，然后刷新。<br>
+      · 如果这里能录、能回放，但 Demo 仍说“没授权”，那是粤语识别服务的问题，不是麦克风。
+    </div>
+
+    <p class="sub" style="margin-top:16px;"><a href="./">← 返回乡音健康管家 Demo</a></p>
+  </div>
+</div>
+<script>
+(async function () {
+  const $ = (s) => document.querySelector(s);
+  const log = (s) => { $("#log").textContent = s; };
+  const env = [];
+  env.push(["HTTPS / 安全上下文", isSecureContext ? "是" : "否"]);
+  env.push(["getUserMedia", navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? "支持" : "不支持"]);
+  env.push(["MediaRecorder", window.MediaRecorder ? "支持" : "不支持"]);
+  env.push(["SpeechRecognition", (window.SpeechRecognition || window.webkitSpeechRecognition) ? "支持" : "不支持"]);
+  let permission = "未知";
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      const p = await navigator.permissions.query({ name: "microphone" });
+      permission = p.state;
+    }
+  } catch (e) { permission = "无法查询"; }
+  env.push(["麦克风权限状态", permission]);
+  env.push(["浏览器", navigator.userAgent.slice(0, 80)]);
+  $("#env").innerHTML = env.map(([k, v]) => "<div><b>" + k + "</b><br>" + v + "</div>").join("");
+
+  let stream = null, recorder = null, chunks = [], audioCtx = null, analyser = null, raf = 0;
+  const stopAll = () => {
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+    cancelAnimationFrame(raf);
+    $("#start").disabled = false;
+    $("#stop").disabled = true;
+    $("#meter > i").style.width = "0%";
+  };
+
+  $("#start").onclick = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      log("ERROR: 当前浏览器没有 getUserMedia，无法录音。请换 Chrome/Safari。");
+      return;
+    }
+    $("#start").disabled = true;
+    $("#stop").disabled = false;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      log("OK: 麦克风已授权。开始录音 5 秒……");
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (const v of data) sum += v;
+        const level = Math.min(100, Math.round((sum / data.length) * 1.8));
+        $("#meter > i").style.width = level + "%";
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+
+      chunks = [];
+      if (window.MediaRecorder) {
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+          $("#playback").src = URL.createObjectURL(blob);
+          log("OK: 录音完成，大小 " + Math.round(blob.size / 1024) + " KB，类型 " + (blob.type || "unknown") + "。下面可以回放。");
+        };
+        recorder.start();
+        setTimeout(() => { if (recorder && recorder.state === "recording") recorder.stop(); }, 5000);
+      } else {
+        setTimeout(() => { log("OK: 麦克风有输入，但浏览器不支持 MediaRecorder，无法回放。"); stopAll(); }, 5000);
+      }
+    } catch (error) {
+      const name = error.name || "unknown";
+      let hint = "";
+      if (name === "NotAllowedError" || name === "SecurityError") hint = "权限被拒绝：请在地址栏/网站设置允许麦克风。";
+      else if (name === "NotFoundError") hint = "没有检测到麦克风设备。";
+      else if (name === "NotReadableError") hint = "麦克风被其他 App 占用。";
+      log("ERROR: " + name + " · " + (error.message || "") + "\n" + hint);
+      stopAll();
+    }
+  };
+
+  $("#stop").onclick = () => {
+    if (recorder && recorder.state === "recording") recorder.stop();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    log("已停止。可以重新测试。");
+    stopAll();
+  };
+})();
+</script>
+</body>
+</html>
