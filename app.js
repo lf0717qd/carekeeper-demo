@@ -15,6 +15,11 @@
     history: [],
     realAsr: false,
     recognition: null,
+    cloudAsr: false,
+    mediaRecorder: null,
+    mediaStream: null,
+    recording: false,
+    recordTimer: null,
     trace: [],
     stage: "idle",
     lastUserText: "",
@@ -800,26 +805,185 @@
   // ---------- mic / input ----------
   function setupAsr() {
     const button = $("#asrModeBtn");
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       if (button) {
-        button.textContent = "浏览器不支持真实语音";
+        button.textContent = "浏览器不支持录音";
+        button.disabled = true;
+      }
+      return;
+    }
+    if (!window.MediaRecorder) {
+      if (button) {
+        button.textContent = "浏览器不支持录音";
         button.disabled = true;
       }
       return;
     }
     button.addEventListener("click", () => {
-      state.realAsr = !state.realAsr;
-      button.textContent = state.realAsr ? "切回模拟" : "用真实语音";
-      showToast(state.realAsr ? "已开启真实粤语语音（首次会请求麦克风）" : "已切回模拟语音");
+      if (!state.apiOnline) {
+        showToast("当前是静态演示版，录音识别需要后端；请用本地版或等公网后端");
+        return;
+      }
+      state.cloudAsr = !state.cloudAsr;
+      button.textContent = state.cloudAsr ? "切回模拟" : "录音识别";
+      showToast(state.cloudAsr ? "已开启云端粤语识别：按一下，讲 5 秒" : "已切回模拟语音");
     });
   }
 
   function handleMic() {
-    if (state.realAsr) {
-      startRealRecognition();
+    if (state.recording) {
+      stopCloudRecording();
+      return;
+    }
+    if (state.cloudAsr) {
+      startCloudAsr();
     } else {
       simulateMic();
+    }
+  }
+
+  function pickAudioMime() {
+    const options = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return "";
+    for (const mime of options) {
+      if (MediaRecorder.isTypeSupported(mime)) return mime;
+    }
+    return "";
+  }
+
+  async function startCloudAsr() {
+    if (state.recording) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast("当前浏览器不支持录音，请换 Chrome/Safari");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.mediaStream = stream;
+      const mime = pickAudioMime();
+      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      state.mediaRecorder = recorder;
+      const chunks = [];
+      recorder.ondataavailable = (event) => { if (event.data && event.data.size) chunks.push(event.data); };
+      recorder.onstop = async () => {
+        state.recording = false;
+        clearTimeout(state.recordTimer);
+        state.recordTimer = null;
+        $("#micBtn").classList.remove("listening");
+        $("#micHint").textContent = "唔识字、唔识用手机，都可以讲";
+        if (state.mediaStream) state.mediaStream.getTracks().forEach((t) => t.stop());
+        state.mediaStream = null;
+        state.mediaRecorder = null;
+        if (!chunks.length) {
+          showToast("未录到声音，请再试一次");
+          return;
+        }
+        const blob = new Blob(chunks, { type: recorder.mimeType || mime || "audio/webm" });
+        addTrace({ tool: "asr.record", title: "录音完成", detail: Math.round(blob.size / 1024) + " KB · " + (blob.type || "unknown") });
+        await uploadAudioForAsr(blob);
+      };
+      recorder.start();
+      state.recording = true;
+      $("#micBtn").classList.add("listening");
+      $("#micHint").textContent = "听紧… 讲 5 秒，讲完会自动停";
+      addTrace({ tool: "asr.cloud", title: "云端粤语识别", detail: "录音 5 秒 → GLM-ASR-2512", tone: "warm" });
+      state.recordTimer = setTimeout(() => {
+        if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+          state.mediaRecorder.stop();
+        }
+      }, 5000);
+    } catch (error) {
+      state.recording = false;
+      $("#micBtn").classList.remove("listening");
+      $("#micHint").textContent = "唔识字、唔识用手机，都可以讲";
+      const message = asrErrorMessage(error.name || "unknown");
+      addTrace({ tool: "asr.error", title: "录音失败", detail: (error.name || "unknown") + " · " + message, tone: "danger" });
+      showToast(message);
+    }
+  }
+
+  function stopCloudRecording() {
+    if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+      state.mediaRecorder.stop();
+    }
+  }
+
+  function encodeWav(audioBuffer) {
+    const channels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const length = audioBuffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = bytesPerSample;
+    const dataSize = length * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    const writeStr = (offset, str) => {
+      for (let i = 0; i < str.length; i += 1) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, dataSize, true);
+    const channelData = [];
+    for (let c = 0; c < channels; c += 1) channelData.push(audioBuffer.getChannelData(c));
+    let offset = 44;
+    for (let i = 0; i < length; i += 1) {
+      let sample = 0;
+      for (let c = 0; c < channels; c += 1) sample += channelData[c][i];
+      sample /= channels;
+      sample = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+    return buffer;
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  async function uploadAudioForAsr(blob) {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+      await audioCtx.close();
+      const wav = encodeWav(audioBuffer);
+      const base64 = arrayBufferToBase64(wav);
+      addTrace({ tool: "asr.upload", title: "上传云端 ASR", detail: "WAV " + Math.round(wav.byteLength / 1024) + " KB · glm-asr-2512" });
+      const response = await fetch(apiUrl("/api/asr"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio_base64: base64, mime: "audio/wav" })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || ("HTTP " + response.status));
+      const text = String(data.text || "").trim();
+      if (!text) {
+        showToast("未听到内容，请再讲一次");
+        addTrace({ tool: "asr.empty", title: "ASR 未返回文字", detail: "可能是太短/太吵", tone: "warm" });
+        return;
+      }
+      addTrace({ tool: "asr.transcript", title: "云端粤语转写", detail: "“" + text + "” · " + (data.latency_ms || 0) + "ms" });
+      startScenario(route(text), text);
+    } catch (error) {
+      addTrace({ tool: "asr.error", title: "云端 ASR 失败", detail: String(error), tone: "danger" });
+      showToast("云端识别失败：" + String(error).slice(0, 80));
     }
   }
 
