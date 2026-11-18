@@ -18,6 +18,8 @@ https://lf0717qd.github.io/carekeeper-demo/
 
 ## 手机麦克风提示
 
+如果页面还是旧行为，请强制刷新一次（或关闭页面重新打开），确保加载新版 app.js。
+
 - 微信内置浏览器通常不支持 Web Speech API，请点右上角“在浏览器打开”。
 - iPhone：设置 → Safari → 麦克风；或地址栏“aA” → 网站设置 → 麦克风 → 允许。
 - Android Chrome：地址栏锁图标 → 权限 → 麦克风 → 允许，然后刷新。
