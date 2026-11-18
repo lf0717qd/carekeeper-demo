@@ -16,6 +16,12 @@ https://lf0717qd.github.io/carekeeper-demo/
 - 场景：用药、血压高、心口闷、复诊、家属报告。
 - 安全：胸痛/气促/冷汗等红线走规则，直接转人工/120；不诊断、不开方。
 
+## 麦克风测试
+
+先打开这个页面，确认浏览器能不能拿到麦克风：
+
+https://lf0717qd.github.io/carekeeper-demo/mic-test.html
+
 ## 手机麦克风提示
 
 如果页面还是旧行为，请强制刷新一次（或关闭页面重新打开），确保加载新版 app.js。
@@ -44,6 +50,7 @@ GitHub Pages 只能托管静态页面，不能运行后端。因此在线版：
 - styles.css
 - app.js
 - config.js
+- mic-test.html
 - preview.png
 - .nojekyll
 
