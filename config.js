@@ -1,4 +1,9 @@
-window.CAREKEEPER_CONFIG = {
-  // GitHub Pages 静态版留空；有公网后端时填完整地址，例如 https://api.example.com
-  apiBase: ""
-};
+(function () {
+  var host = location.hostname;
+  var local = host === "127.0.0.1" || host === "localhost";
+  window.CAREKEEPER_CONFIG = {
+    // 本地 server.py 用相对路径；GitHub Pages 走临时公网后端。
+    // 隧道关闭后会自动回退静态演示。
+    apiBase: local ? "" : "https://carekeeper-demo.loca.lt"
+  };
+})();
