@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>乡音健康管家 · 粤语优先 Demo V1.1</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-mic" viewBox="0 0 24 24">
+      <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+      <path d="M5 11a7 7 0 0 0 14 0"></path>
+      <path d="M12 18v3M9 21h6"></path>
+    </symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24">
+      <path d="M11 5 6 9H2v6h4l5 4V5Z"></path>
+      <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+      <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 24 24">
+      <path d="m22 2-7 20-4-9-9-4Z"></path>
+      <path d="M22 2 11 13"></path>
+    </symbol>
+    <symbol id="i-family" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3"></circle>
+      <path d="M3 21v-2a6 6 0 0 1 12 0v2"></path>
+      <circle cx="17" cy="9" r="2"></circle>
+      <path d="M17 13a4 4 0 0 1 4 4v2"></path>
+    </symbol>
+    <symbol id="i-doctor" viewBox="0 0 24 24">
+      <path d="M8 3v4a4 4 0 0 0 8 0V3"></path>
+      <path d="M12 11v4"></path>
+      <path d="M9 15h6"></path>
+      <circle cx="12" cy="19" r="2"></circle>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="M12 3 2 21h20L12 3Z"></path>
+      <path d="M12 9v5"></path>
+      <circle cx="12" cy="18" r="1"></circle>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="m5 12 4 4L19 6"></path>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 7v5l3 2"></path>
+    </symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24">
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 3v12"></path>
+      <path d="m7 10 5 5 5-5"></path>
+      <path d="M5 21h14"></path>
+    </symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24">
+      <path d="m9 18 6-6-6-6"></path>
+    </symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24">
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"></path>
+    </symbol>
+  </svg>
+
+  <div class="page">
+    <div id="offlineNotice" class="offline-notice hidden">
+      <strong>GitHub Pages 静态演示</strong>
+      <span>真实 LLM 需本地运行 server.py；当前自由问答使用预置回答，关键场景仍按脚本演示。</span>
+    </div>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><svg><use href="#i-heart"></use></svg></div>
+        <div class="brand-copy">
+          <div class="brand-line">
+            <h1>乡音健康管家</h1>
+            <span class="version">V1.1</span>
+          </div>
+          <p>粤语优先 · 居家健康智能体</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill" id="agentStatus"><i></i> Agent 在线</span>
+        <span class="demo-pill">演示数据 · 非真实患者</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="phone-column">
+        <div class="phone-stage">
+          <div class="phone-glow"></div>
+          <div class="phone-shell">
+            <div class="phone-notch"></div>
+            <div class="phone-screen" id="phoneScreen">
+              <div class="elder-head">
+                <div class="avatar">陈</div>
+                <div class="elder-meta">
+                  <h2>陈婆婆</h2>
+                  <p>76岁 · 独居 · 广州荔湾</p>
+                </div>
+                <div class="signal" aria-label="网络良好"><span></span><span></span><span></span></div>
+              </div>
+
+              <div class="voice-row">
+                <div class="voice-label"><span class="pulse-dot"></span> 粤语优先</div>
+                <label class="switch" title="自动粤语播报">
+                  <input id="autoSpeak" type="checkbox">
+                  <span></span>
+                </label>
+                <span class="switch-label">自动播报</span>
+              </div>
+
+              <div class="today-strip">
+                <svg><use href="#i-clock"></use></svg>
+                <span>今日：量血压 · 早上药 · 下周三复诊</span>
+              </div>
+
+              <div class="mic-zone">
+                <button class="mic-button" id="micBtn" aria-label="按一下讲嘢">
+                  <span class="mic-ring"></span>
+                  <span class="mic-ring mic-ring-2"></span>
+                  <svg><use href="#i-mic"></use></svg>
+                  <span class="mic-text">按一下<br>讲嘢</span>
+                </button>
+                <p class="mic-hint"><span id="micHint">唔识字、唔识用手机，都可以讲</span><button id="asrModeBtn" class="link-btn" type="button">用真实语音</button></p>
+              </div>
+
+              <div id="alertBanner" class="alert-banner hidden">
+                <svg><use href="#i-alert"></use></svg>
+                <div><strong>红线场景 · 已升级</strong><span>已模拟通知家属并转人工/120</span></div>
+              </div>
+
+              <div id="chat" class="chat" aria-live="polite"></div>
+
+              <div class="suggestions" id="suggestions">
+                <button class="chip" data-scenario="medication">用药</button>
+                <button class="chip" data-scenario="bp">血压高</button>
+                <button class="chip" data-scenario="emergency">心口闷</button>
+                <button class="chip" data-scenario="followup">复诊</button>
+                <button class="chip" data-scenario="family">家属报告</button>
+              </div>
+
+              <div class="composer">
+                <input id="textInput" type="text" autocomplete="off" placeholder="试一句：我今晚可唔可以食粥？">
+                <button id="sendBtn" aria-label="发送"><svg><use href="#i-send"></use></svg></button>
+              </div>
+
+              <div class="phone-actions">
+                <button data-action="repeat"><svg><use href="#i-speaker"></use></svg>重听</button>
+                <button data-action="family"><svg><use href="#i-family"></use></svg>家人</button>
+                <button data-action="doctor"><svg><use href="#i-doctor"></use></svg>医生</button>
+              </div>
+
+              <div class="voice-foot" id="voiceStatus">正在检测粤语声线…</div>
+            </div>
+          </div>
+        </div>
+        <p class="phone-caption">老人端：一屏一个“讲嘢”按钮，不用注册、不用选菜单。</p>
+      </section>
+
+      <section class="workspace">
+        <div class="workspace-card">
+          <div class="workspace-head">
+            <div>
+              <span class="eyebrow">AGENT RUNTIME</span>
+              <h2>智能体工作台</h2>
+              <p class="workspace-sub">看它怎么听、怎么想、怎么做、怎么兜底 · 指标为演示值</p>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><strong>92%</strong><span>粤语识别</span></div>
+              <div class="kpi"><strong>100%</strong><span>红线召回</span></div>
+              <div class="kpi"><strong>87%</strong><span>任务完成</span></div>
+            </div>
+          </div>
+
+          <div class="stage-line" id="stageLine">
+            <span class="stage-pill" data-stage="observe">观察</span>
+            <span class="stage-arrow">→</span>
+            <span class="stage-pill" data-stage="understand">理解</span>
+            <span class="stage-arrow">→</span>
+            <span class="stage-pill" data-stage="decide">决策</span>
+            <span class="stage-arrow">→</span>
+            <span class="stage-pill" data-stage="act">行动</span>
+            <span class="stage-arrow">→</span>
+            <span class="stage-pill" data-stage="reflect">反思</span>
+          </div>
+
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="trace" role="tab">Agent 轨迹</button>
+            <button class="tab" data-tab="profile" role="tab">健康画像</button>
+            <button class="tab" data-tab="family" role="tab">家属报告</button>
+          </div>
+
+          <div class="tab-panel active" id="panel-trace">
+            <div class="panel-head">
+              <div>
+                <h3>Agent 轨迹</h3>
+                <p>每一步都可回放、可审计，不是黑盒聊天</p>
+              </div>
+              <button class="ghost-btn" id="exportTrace"><svg><use href="#i-download"></use></svg>导出 JSON</button>
+            </div>
+            <div id="traceList" class="trace-list"></div>
+            <div class="trace-safety">
+              <div class="trace-safety-head">
+                <span class="safety-kicker">RED FLAGS</span>
+                <strong>红线规则</strong>
+              </div>
+              <p>胸痛 · 呼吸困难 · 意识改变 · 跌倒 · 低血糖 → 立即转人工 / 120</p>
+            </div>
+            <div class="trace-tools">
+              <span>可用工具</span>
+              <code>asr.transcribe</code>
+              <code>memory.get_profile</code>
+              <code>triage.red_flags</code>
+              <code>notify.family</code>
+              <code>calendar.create</code>
+              <code>escalate.120</code>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="panel-profile">
+            <div class="panel-head">
+              <div>
+                <h3>健康画像与记忆</h3>
+                <p>这是 Agent 的“长期记忆”，不是每轮重新问</p>
+              </div>
+            </div>
+            <div class="profile-grid">
+              <article class="info-card">
+                <span class="card-label">基本</span>
+                <h4>陈婆婆 · 76岁</h4>
+                <p>独居，广州荔湾；儿子陈先生常住深圳。</p>
+                <div class="tag-row"><span class="tag">高血压 2 级</span><span class="tag">2 型糖尿病</span></div>
+              </article>
+              <article class="info-card">
+                <span class="card-label">用药</span>
+                <h4>在服 2 种</h4>
+                <ul class="med-list">
+                  <li><b>氨氯地平</b><span>5mg · 早上饭后 · 每日 1 次</span></li>
+                  <li><b>二甲双胍</b><span>0.5g · 早晚饭后 · 每日 2 次</span></li>
+                </ul>
+                <p class="muted">无已知过敏；最近未发现重复用药。</p>
+              </article>
+              <article class="info-card">
+                <span class="card-label">最近读数</span>
+                <h4>血压 180/100</h4>
+                <p>今日 08:40；昨日 165/95；最近一次血糖 8.6 mmol/L。</p>
+                <div class="mini-bars"><span style="--h:44%"></span><span style="--h:58%"></span><span style="--h:88%"></span><span style="--h:70%"></span><span class="hot" style="--h:100%"></span></div>
+              </article>
+              <article class="info-card">
+                <span class="card-label">偏好</span>
+                <h4>慢速粤语 · 大字</h4>
+                <p>称呼“婆婆”；避免长句；关键信息要复述；晚上 8 点后不主动外呼。</p>
+              </article>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="panel-family">
+            <div class="panel-head">
+              <div>
+                <h3>家属报告</h3>
+                <p>家属看到的是“结论 + 下一步”，不是一堆原始对话</p>
+              </div>
+              <button class="ghost-btn" id="sendFamily"><svg><use href="#i-send"></use></svg>模拟发送给家属</button>
+            </div>
+            <div class="family-report" id="familyReport"></div>
+          </div>
+
+          <div class="safety-strip">
+            <strong>安全边界</strong>
+            <span>本 Demo 只演示健康教育与就医引导，不诊断、不开方；胸痛、呼吸困难、意识改变、跌倒、低血糖等红线直接转人工/120。所有人物与数据均为合成。</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>乡音健康管家 · 粤语优先 Demo V1.1</span>
+      <span>Agent 不在这里，也不在那里——它在后端编排层：记忆 + 技能 + 工具 + 规则 + 轨迹 + 人工兜底。</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
