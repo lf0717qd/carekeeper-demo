@@ -825,6 +825,7 @@
       }
       return;
     }
+    button.textContent = "录音识别";
     button.addEventListener("click", () => {
       if (!state.apiOnline) {
         showToast("当前是静态演示版，录音识别需要后端；请用本地版或等公网后端");
