@@ -746,6 +746,17 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
   background: #fff; border: 1px solid #cfe5d6; color: #3c6b52; font-size: 9px;
 }
 .family-auth small { color: #6b8a78; font-size: 9px; }
+
+.auth-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.small-btn.danger { color: #8a2d20; border-color: #efc9c2; background: #fff7f5; }
+.small-btn.danger:hover { background: #fff0ec; }
+.delete-receipt {
+  margin: 10px auto 0; padding: 8px 10px; max-width: 330px;
+  border: 1px dashed #d8b9a6; border-radius: 10px;
+  background: #fffaf2; color: #7a5a3a; font-size: 10px; line-height: 1.5;
+  word-break: break-all;
+}
+
 .family-locked {
   padding: 24px 16px; text-align: center;
   border: 1px dashed #c9d9d6; border-radius: 17px;
