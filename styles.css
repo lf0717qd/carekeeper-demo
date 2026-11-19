@@ -752,6 +752,27 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
   background: #fbfdfc; color: #52676a;
 }
 .family-locked h4 { margin: 8px 0 4px; color: var(--ink); font-size: 14px; }
+
+.auth-audit { margin-top: 5px; font-size: 9px; color: #4d6b5a; }
+.auth-audit summary { cursor: pointer; color: #2f6b50; }
+.auth-audit ul { margin: 4px 0 0; padding-left: 14px; }
+.auth-audit li { margin: 3px 0; line-height: 1.45; }
+.code-box {
+  margin: 10px auto; padding: 9px 12px; max-width: 260px;
+  border: 1px dashed #b9d7ca; border-radius: 12px; background: #fff;
+  color: #2f5f45; text-align: center;
+}
+.code-box small { display: block; font-size: 9px; color: #6b8a78; }
+.code-box strong { display: block; margin-top: 3px; font-family: var(--mono); font-size: 24px; letter-spacing: .18em; }
+.code-row { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin: 8px 0 2px; }
+.code-row input {
+  min-width: 0; width: 110px; padding: 7px 8px;
+  border: 1px solid #cfdedb; border-radius: 8px;
+  font-family: var(--sans); font-size: 11px; color: var(--ink); background: #fff;
+}
+.code-row input#familyAgentInput { width: 150px; }
+.code-msg { min-height: 16px; color: #a34e16; font-size: 9.5px; margin: 4px 0; }
+
 .family-locked p { font-size: 10.5px; line-height: 1.65; margin: 4px auto 10px; max-width: 330px; }
 .lock-icon {
   width: 42px; height: 42px; margin: 0 auto; border-radius: 14px;
