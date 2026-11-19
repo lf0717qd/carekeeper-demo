@@ -100,6 +100,10 @@
     if (params.get("tab") === "family") {
       switchTab("family");
     }
+    if (params.get("unauth") === "1") {
+      ensureFamilyState().access.authorized = false;
+      renderFamilyReport();
+    }
     const demoParam = params.get("demo");
     if (demoParam && scenarioUserText[demoParam]) {
       setTimeout(() => startScenario(demoParam), 700);
@@ -1222,9 +1226,11 @@
         authorized: true,
         agent: "儿子陈先生",
         scopes: ["查看今日报告", "接收红线告警", "复诊提醒"],
-        updated: familyToday()
+        updated: familyToday(),
+        audit: [{ time: "2026-11-19", action: "初始授权", detail: "Demo 预置" }]
       };
     }
+    if (!Array.isArray(r.access.audit)) r.access.audit = [];
     if (!Array.isArray(r.alertsList)) r.alertsList = [];
     if (!r.followup) {
       r.followup = {
@@ -1237,23 +1243,41 @@
     return r;
   }
 
+  function auditAuth(r, action, detail) {
+    if (!Array.isArray(r.access.audit)) r.access.audit = [];
+    r.access.audit.push({ time: nowTime(), action: action, detail: detail });
+    r.access.audit = r.access.audit.slice(-20);
+  }
+
   function authCard(r) {
     const scopes = (r.access.scopes || []).map((x) => "<span class='auth-scope'>" + escapeHTML(x) + "</span>").join("");
+    const audit = (r.access.audit || []).slice(-3).reverse().map((a) =>
+      '<li><strong>' + escapeHTML(a.action) + '</strong> · ' + escapeHTML(a.time) + '<br>' + escapeHTML(a.detail) + '</li>').join("");
     return '<div class="family-auth">' +
       '<div><span class="auth-pill">已授权</span> <strong>' + escapeHTML(r.access.agent) + '</strong>' +
       '<div class="auth-scopes">' + scopes + '</div>' +
-      '<small>授权时间：' + escapeHTML(r.access.updated) + ' · 老人可随时撤回</small></div>' +
+      '<small>授权时间：' + escapeHTML(r.access.updated) + ' · 老人可随时撤回</small>' +
+      '<details class="auth-audit"><summary>授权记录（' + (r.access.audit || []).length + '）</summary><ul>' + audit + '</ul></details>' +
+      '</div>' +
       '<button class="small-btn ghost" id="familyRevoke">撤回授权</button>' +
       '</div>';
   }
 
-  function lockedCard() {
+  function lockedCard(r, msg) {
+    const hasCode = !!r.access.code;
+    const codeBox = hasCode
+      ? '<div class="code-box"><small>老人授权码（5分钟有效）</small><strong>' + escapeHTML(r.access.code) + '</strong></div>' +
+        '<div class="code-row"><input id="familyCodeInput" inputmode="numeric" maxlength="6" placeholder="输入6位授权码">' +
+        '<input id="familyAgentInput" maxlength="20" placeholder="家属称呼，如儿子陈先生">' +
+        '<button class="small-btn" id="familyVerify">确认授权</button></div>'
+      : '<button class="small-btn" id="familyGenCode">生成授权码（老人操作）</button>';
     return '<div class="family-locked">' +
       '<div class="lock-icon">锁</div>' +
       '<h4>未授权，家属看不到报告</h4>' +
-      '<p>需要老人授权后，家属才能查看今日报告、接收红线告警、查看复诊提醒。</p>' +
-      '<button class="small-btn" id="familyAuthorize">模拟老人授权</button>' +
-      '<p class="muted tiny">演示：真实产品需要老人短信/人脸/现场确认，并记录授权与撤回。</p>' +
+      '<p>老人生成 6 位授权码，家属输入后生效；5 分钟有效，可随时撤回。</p>' +
+      codeBox +
+      '<p class="code-msg" id="familyCodeMsg">' + escapeHTML(msg || "") + '</p>' +
+      '<p class="muted tiny">演示：真实产品需要短信/人脸/现场确认，并记录授权与撤回。</p>' +
       '</div>';
   }
 
@@ -1323,13 +1347,36 @@
     const r = ensureFamilyState();
 
     if (!r.access.authorized) {
-      root.innerHTML = lockedCard();
-      const auth = $("#familyAuthorize");
-      if (auth) auth.addEventListener("click", () => {
-        r.access.authorized = true;
-        r.access.updated = familyToday();
+      root.innerHTML = lockedCard(r, "");
+      const gen = $("#familyGenCode");
+      if (gen) gen.addEventListener("click", () => {
+        r.access.code = String(Math.floor(100000 + Math.random() * 900000));
+        r.access.codeExpires = Date.now() + 5 * 60 * 1000;
+        auditAuth(r, "生成授权码", "老人侧生成；5分钟有效");
         renderFamilyReport();
-        showToast("已模拟老人授权");
+        showToast("授权码已生成");
+      });
+      const verify = $("#familyVerify");
+      if (verify) verify.addEventListener("click", () => {
+        const code = ($("#familyCodeInput").value || "").trim();
+        const name = ($("#familyAgentInput").value || "").trim() || "家属";
+        const msg = $("#familyCodeMsg");
+        if (!r.access.code || !r.access.codeExpires || Date.now() > r.access.codeExpires) {
+          if (msg) msg.textContent = "授权码已过期，请老人重新生成。";
+          return;
+        }
+        if (code !== r.access.code) {
+          if (msg) msg.textContent = "授权码不对，请核对后重试。";
+          return;
+        }
+        r.access.authorized = true;
+        r.access.agent = name;
+        r.access.updated = familyToday();
+        r.access.code = null;
+        r.access.codeExpires = 0;
+        auditAuth(r, "授权成功", name + " 输入授权码");
+        renderFamilyReport();
+        showToast("授权成功");
       });
       return;
     }
@@ -1369,6 +1416,9 @@
     const revoke = $("#familyRevoke");
     if (revoke) revoke.addEventListener("click", () => {
       r.access.authorized = false;
+      r.access.code = null;
+      r.access.codeExpires = 0;
+      auditAuth(r, "撤回授权", "家属端立即锁定");
       renderFamilyReport();
       showToast("已撤回授权，家属端已锁定");
       addTrace({ tool: "consent.revoke", title: "撤回授权", detail: "家属端立即锁定；不再发送报告/告警" });
