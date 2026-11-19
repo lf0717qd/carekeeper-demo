@@ -37,6 +37,7 @@
   .summary div{background:#f4f9f7;border:1px solid #e0ebe8;border-radius:10px;padding:8px}
   .summary strong{display:block;font-size:17px;color:var(--teal)}
   .summary span{font-size:10px;color:var(--muted)}
+  .ext-links{display:flex;gap:8px;flex-wrap:wrap}.ext-links a{display:inline-block;padding:6px 9px;border:1px solid #cfdedb;border-radius:8px;color:var(--teal);text-decoration:none;font-size:12px;background:#fff}.ext-links a:hover{background:#f4faf8}
   footer{text-align:center;color:var(--muted);font-size:10px;margin-top:20px}
   @media(max-width:640px){.summary{grid-template-columns:1fr 1fr}.wrap{padding:12px 10px 40px}header{padding:18px}}
 </style>
@@ -47,6 +48,16 @@
     <h1>粤语 TTS 真机测试台</h1>
     <p>乡音健康管家 V1.1 · 测首包延迟、可懂度、自然度；数据只存本机浏览器。</p>
   </header>
+
+  <div class="card">
+    <strong>潮汕 / 客家 L1 候选</strong>
+    <p class="muted" style="margin:4px 0 8px">下面是候选，不是已接产品：香港客家话不是梅县腔；潮汕只有文本前端，没有完整 TTS。</p>
+    <div class="ext-links">
+      <a href="https://hkilang.github.io/TTS/" target="_blank" rel="noopener">打开香港客家话 TTS（L1 候选）</a>
+      <a href="https://github.com/p1an-lin-jung/teochew-g2p" target="_blank" rel="noopener">潮汕 G2P 文本前端（不是 TTS）</a>
+      <a href="https://github.com/Hydramus/TTS" target="_blank" rel="noopener">Hydramus/TTS（MIT，香港客家话）</a>
+    </div>
+  </div>
 
   <div class="card">
     <div class="row">
