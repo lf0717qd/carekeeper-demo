@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KB v0.2 只读看板 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--teal2:#1f6f7a;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8;--bad:#b23a2b;--good:#2f7d5b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.55}
+  .wrap{max-width:1320px;margin:0 auto;padding:20px 16px 50px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:20px 24px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  header h1{margin:0 0 4px;font-size:23px}header p{margin:0;font-size:12px;opacity:.85}
+  .readonly{background:#fff4e8;color:#7a5438;border:1px solid #efd8c3;border-radius:999px;padding:5px 10px;font-size:11px;white-space:nowrap}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+  .stat{background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:10px 12px}
+  .stat strong{display:block;font-family:var(--mono);font-size:22px;color:var(--teal)}.stat span{font-size:10px;color:var(--muted)}
+  .stat.bad strong{color:var(--bad)}.stat.good strong{color:var(--good)}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,select{font:inherit;font-size:12px;padding:7px 9px;border:1px solid #cfdedb;border-radius:9px;background:#fff;color:var(--ink)}
+  input[type=search]{min-width:240px}
+  label.check{display:flex;gap:5px;align-items:center;font-size:11px;color:#52676a}
+  button{font:inherit;font-size:12px;border:0;border-radius:9px;padding:8px 12px;background:var(--teal);color:#fff;cursor:pointer}
+  .table-wrap{max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{padding:7px 8px;border-bottom:1px solid #e8f0ee;text-align:left;vertical-align:top}
+  th{position:sticky;top:0;background:#f4f9f7;color:#3c5a5e;z-index:2;font-weight:600}
+  tr{cursor:pointer}tr:hover td{background:#f8fcfb}
+  .pill{display:inline-block;padding:1px 6px;border-radius:999px;font-size:9px;border:1px solid #dce8e5;background:#f4f9f7;color:#52676a;white-space:nowrap}
+  .pill.high{background:#fff3f1;border-color:#f2c8c3;color:#7a1b13}
+  .pill.fail{background:#fff3f1;border-color:#f2c8c3;color:#7a1b13}
+  .pill.near{background:#fff8e8;border-color:#efd8a8;color:#7a5438}
+  .pill.exact{background:#eef8f2;border-color:#cfe5d6;color:#2f5f45}
+  .pill.review{background:#eef3ff;border-color:#c9d8f0;color:#2f4f7a}
+  .muted{color:var(--muted);font-size:10px}
+  .detail{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+  .detail h3{margin:0 0 4px;font-size:14px}.detail p{margin:4px 0;font-size:12px;color:#486166;white-space:pre-wrap}
+  .detail .meta{font-size:10px;color:var(--muted)}
+  .empty{padding:30px;text-align:center;color:var(--muted);font-size:12px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+  @media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}header{padding:16px}.wrap{padding:12px 10px 40px}.table-wrap{max-height:62vh}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>KB v0.2 只读看板</h1>
+      <p>394 chunk · 来源/风险/AI核对/人工审核状态 · 只读，不发布、不回滚</p>
+    </div>
+    <span class="readonly">只读 MVP · 不替代护理签字</span>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <div class="filters">
+      <input id="q" type="search" placeholder="搜 chunk / 文档 / 章节">
+      <select id="doc"><option value="">全部文档</option></select>
+      <select id="risk"><option value="">全部风险</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select>
+      <select id="ai"><option value="">全部 AI 核对</option><option value="exact">exact</option><option value="near">near</option><option value="fail">fail</option></select>
+      <label class="check"><input id="onlyReview" type="checkbox"> 只看待审30条</label>
+      <span class="muted" id="count"></span>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>#</th><th>chunk</th><th>文档</th><th>章节</th><th>风险</th><th>AI</th><th>状态</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div id="detail" class="detail" hidden></div>
+  </div>
+
+  <footer>乡音健康管家 · KB 只读管理看板 · 审核结论以 Excel/护理签字为准</footer>
+</div>
+
+<script>
+(function(){
+  const $ = (s) => document.querySelector(s);
+  let data = null, filtered = [];
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  const pill = (cls, text) => '<span class="pill '+cls+'">'+esc(text)+'</span>';
+
+  function renderStats(){
+    const s=data.stats;
+    const items=[
+      ["总 chunk",s.total,""],["高风险",s.high,"bad"],["待人工审",s.review,"review"],
+      ["AI exact",s.exact,"good"],["AI near",s.near,""],["AI fail",s.fail,"bad"]
+    ];
+    $("#stats").innerHTML=items.map(([k,v,c])=>'<div class="stat '+(c||'')+'"><strong>'+v+'</strong><span>'+k+'</span></div>').join("");
+  }
+  function renderDocs(){
+    const sel=$("#doc");
+    data.docs.forEach(d=>{const o=document.createElement("option");o.value=d.doc_id;o.textContent=d.title+" ("+d.count+")";sel.appendChild(o);});
+  }
+  function apply(){
+    const q=$("#q").value.trim().toLowerCase();
+    const doc=$("#doc").value, risk=$("#risk").value, ai=$("#ai").value, only=$("#onlyReview").checked;
+    filtered=data.chunks.filter(c=>{
+      if(doc && c.doc_id!==doc) return false;
+      if(risk && c.risk!==risk) return false;
+      if(ai && c.ai!==ai) return false;
+      if(only && !c.review) return false;
+      if(q && !(c.chunk_id+" "+c.title+" "+c.section+" "+c.text).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    $("#count").textContent="显示 "+filtered.length+" / "+data.chunks.length;
+    $("#rows").innerHTML=filtered.length?filtered.map((c,i)=>
+      '<tr data-i="'+i+'"><td>'+c.chunk_id.split("-").pop()+'</td>'+
+      '<td><strong>'+esc(c.chunk_id)+'</strong></td>'+
+      '<td>'+esc(c.title)+'</td>'+
+      '<td>'+esc(c.section).slice(0,90)+'</td>'+
+      '<td>'+pill(c.risk==="high"?"high":"",c.risk)+'</td>'+
+      '<td>'+pill(c.ai,c.ai)+'</td>'+
+      '<td>'+(c.review?pill("review","待审"):"")+' '+esc(c.status)+'</td></tr>').join(""):'<tr><td colspan="7" class="empty">没有匹配的 chunk</td></tr>';
+    $("#detail").hidden=true;
+  }
+  function show(i){
+    const c=filtered[i]; if(!c) return;
+    const box=$("#detail"); box.hidden=false;
+    box.innerHTML='<h3>'+esc(c.chunk_id)+'</h3>'+
+      '<div class="meta">'+esc(c.title)+' · '+esc(c.section)+' · 页码 '+esc(c.page||"—")+' · '+esc(c.risk)+' · AI '+esc(c.ai)+' · '+esc(c.status)+'</div>'+
+      '<p>'+esc(c.text)+'</p>'+
+      '<div class="meta">只读展示，不代表内容已审核通过；以 Excel 护理/药师签字为准。</div>';
+  }
+  $("#q").addEventListener("input",apply);["doc","risk","ai"].forEach(id=>$("#"+id).addEventListener("change",apply));$("#onlyReview").addEventListener("change",apply);
+  $("#rows").addEventListener("click",e=>{const tr=e.target.closest("tr[data-i]");if(tr)show(Number(tr.dataset.i));});
+  fetch("kb-admin.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{
+    data=d;renderStats();renderDocs();apply();
+  }).catch(e=>{
+    $("#stats").innerHTML='<div class="stat bad" style="grid-column:1/-1"><strong>加载失败</strong><span>'+esc(e.message)+'</span></div>';
+  });
+})();
+</script>
+</body>
+</html>
