@@ -1216,6 +1216,7 @@
 
   function ensureFamilyState() {
     const r = state.familyReport;
+    r.date = familyToday();
     if (!r.access) {
       r.access = {
         authorized: true,
