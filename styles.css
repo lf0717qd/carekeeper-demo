@@ -342,6 +342,17 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
   font-size: 9.5px;
 }
 .msg-meta svg { width: 12px; height: 12px; }
+.citations {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-left: 2px solid var(--orange);
+  border-radius: 0 8px 8px 0;
+  background: #fffaf2;
+  color: #7a5a3a;
+  font-size: 9.5px;
+  line-height: 1.55;
+  word-break: break-word;
+}
 .typing-bubble { display: inline-flex; gap: 4px; align-items: center; min-height: 18px; }
 .typing-bubble i {
   width: 5px; height: 5px; border-radius: 50%; background: #6f8f91;
