@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>潮汕话 / 客家话 L1 语音 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.6}
+  .wrap{max-width:1200px;margin:0 auto;padding:20px 16px 50px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:20px 24px}
+  header h1{margin:0 0 4px;font-size:23px}header p{margin:0;font-size:12px;opacity:.85}
+  .badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#fff4e8;color:#7a5438;font-size:9px;border:1px solid #efd8c3;vertical-align:middle}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 15px;min-width:0}
+  .card h2{margin:0 0 4px;font-size:17px}.card p{margin:0 0 8px;font-size:11px;color:var(--muted)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  a.btn{display:inline-block;padding:7px 10px;border-radius:9px;background:var(--teal);color:#fff;text-decoration:none;font-size:11px}
+  a.btn.ghost{background:#fff;color:var(--teal);border:1px solid #cfdedb}
+  iframe{width:100%;height:540px;border:1px solid #dce8e5;border-radius:12px;background:#fff}
+  .note{background:#fff4e8;border:1px solid #efd8c3;color:#7a5438;border-radius:12px;padding:10px 12px;font-size:11px;margin-top:12px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}iframe{height:520px}.wrap{padding:12px 10px 40px}header{padding:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>潮汕话 / 客家话 L1 语音 <span class="badge">L1 演示</span></h1>
+    <p>外部语音服务嵌入；不是原生口音承诺，也不是医疗建议。</p>
+  </header>
+
+  <div class="note">
+    这两个是外部 L1 语音演示：能出声、能试听，但**没有接进问诊主流程**。正式上线前仍需本地老人盲听；听不懂就回退真人短句。
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>潮汕话</h2>
+      <p>L1 外部语音演示 · 口音以服务实际发音为准</p>
+      <div class="actions">
+        <a class="btn" href="https://suisiann.ithuan.tw/" target="_blank" rel="noopener">打开全屏</a>
+        <a class="btn ghost" href="https://suisiann.ithuan.tw/" target="_blank" rel="noopener">新窗口打开</a>
+      </div>
+      <iframe src="https://suisiann.ithuan.tw/" title="潮汕话 L1 语音" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </section>
+
+    <section class="card">
+      <h2>客家话</h2>
+      <p>L1 外部语音演示 · 口音以服务实际发音为准</p>
+      <div class="actions">
+        <a class="btn" href="https://hkilang.github.io/TTS/" target="_blank" rel="noopener">打开全屏</a>
+        <a class="btn ghost" href="https://hkilang.github.io/TTS/" target="_blank" rel="noopener">新窗口打开</a>
+      </div>
+      <iframe src="https://hkilang.github.io/TTS/" title="客家话 L1 语音" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </section>
+  </div>
+
+  <footer>乡音健康管家 · L1 方言语音演示 · 不诊断、不开药</footer>
+</div>
+</body>
+</html>
