@@ -729,6 +729,50 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
   font-size: 10.5px; color: #486166; line-height: 1.55;
   animation: slideIn .25s ease both;
 }
+
+.family-auth {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  padding: 11px 12px; margin-bottom: 10px;
+  border: 1px solid #cfe5d6; border-radius: 13px;
+  background: #f2fbf6; color: #2f5f45; font-size: 10.5px; line-height: 1.5;
+}
+.auth-pill {
+  display: inline-block; padding: 2px 7px; border-radius: 999px;
+  background: #2f7d5b; color: #fff; font-size: 9px; margin-right: 3px;
+}
+.auth-scopes { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.auth-scope {
+  padding: 2px 6px; border-radius: 999px;
+  background: #fff; border: 1px solid #cfe5d6; color: #3c6b52; font-size: 9px;
+}
+.family-auth small { color: #6b8a78; font-size: 9px; }
+.family-locked {
+  padding: 24px 16px; text-align: center;
+  border: 1px dashed #c9d9d6; border-radius: 17px;
+  background: #fbfdfc; color: #52676a;
+}
+.family-locked h4 { margin: 8px 0 4px; color: var(--ink); font-size: 14px; }
+.family-locked p { font-size: 10.5px; line-height: 1.65; margin: 4px auto 10px; max-width: 330px; }
+.lock-icon {
+  width: 42px; height: 42px; margin: 0 auto; border-radius: 14px;
+  display: grid; place-items: center; background: #e8f3f0; color: var(--teal); font-size: 15px;
+}
+.family-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+.small-btn.ghost { background: #f7fbfa; }
+.med-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 9.5px; }
+.med-table th, .med-table td { border: 1px solid #dce8e5; padding: 5px 6px; text-align: left; vertical-align: top; }
+.med-table th { background: #f4f9f7; color: #3c5a5e; font-weight: 600; }
+.alert-list { display: grid; gap: 6px; }
+.alert-item {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  padding: 8px 9px; border-radius: 10px;
+  background: #fff3f1; border: 1px solid #f2c8c3; color: #7a1b13;
+  font-size: 9.5px; line-height: 1.55;
+}
+.alert-item.handled { background: #f2fbf6; border-color: #cfe5d6; color: #2f5f45; }
+.alert-item .small-btn { flex: 0 0 auto; padding: 4px 6px; font-size: 9px; }
+.tiny { font-size: 9px !important; }
+
 .family-message .fm-avatar {
   width: 24px; height: 24px; border-radius: 8px; flex: 0 0 auto;
   display: grid; place-items: center; background: var(--teal); color: white; font-size: 10px;
