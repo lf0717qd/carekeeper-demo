@@ -1313,7 +1313,10 @@
       '<small>授权时间：' + escapeHTML(r.access.updated) + ' · 老人可随时撤回</small>' +
       '<details class="auth-audit"><summary>授权记录（' + (r.access.audit || []).length + '）</summary><ul>' + audit + '</ul></details>' +
       '</div>' +
+      '<div class="auth-actions">' +
       '<button class="small-btn ghost" id="familyRevoke">撤回授权</button>' +
+      '<button class="small-btn danger" id="familyDelete">删除今日数据</button>' +
+      '</div>' +
       '</div>';
   }
 
@@ -1332,6 +1335,7 @@
       codeBox +
       '<p class="code-msg" id="familyCodeMsg">' + escapeHTML(msg || "") + '</p>' +
       '<p class="muted tiny">演示：真实产品需要短信/人脸/现场确认，并记录授权与撤回。</p>' +
+      (r.deleteReceipt ? '<p class="delete-receipt">删除凭证：' + escapeHTML(r.deleteReceipt) + '</p>' : '') +
       '</div>';
   }
 
@@ -1484,6 +1488,17 @@
       showToast("已撤回授权，家属端已锁定");
       addTrace({ tool: "consent.revoke", title: "撤回授权", detail: "家属端立即锁定；不再发送报告/告警" });
     });
+    const del = $("#familyDelete");
+    if (del) del.addEventListener("click", async () => {
+      const ok = await confirmAction({
+        title: "删除今日数据？",
+        message: "将删除今日报告、红线告警、用药清单，并同时撤回授权。删除后不可恢复，只保留一条不含健康内容的删除凭证。",
+        confirmText: "删除数据",
+        danger: true
+      });
+      if (!ok) return;
+      await deleteFamilyData(r);
+    });
     const send = $("#familySend");
     if (send) send.addEventListener("click", async () => {
       const ok = await confirmAction({
@@ -1507,6 +1522,39 @@
         showToast("已标记处理");
       });
     });
+  }
+
+  async function deleteFamilyData(r) {
+    const now = nowTime();
+    const receipt = "DEL-" + familyToday().replace(/-/g, "") + "-" + now.replace(/:/g, "");
+    const audit = Array.isArray(r.access.audit) ? r.access.audit.slice(-20) : [];
+    audit.push({ time: now, action: "删除数据", detail: receipt });
+    state.familyReport = {
+      date: familyToday(),
+      summary: "今日数据已删除。",
+      bp: "—",
+      med: "—",
+      alerts: 0,
+      alertText: "",
+      notes: [],
+      messages: [],
+      alertsList: [],
+      followup: r.followup,
+      deletedAt: now,
+      deleteReceipt: receipt,
+      access: {
+        authorized: false,
+        agent: "",
+        scopes: [],
+        updated: familyToday(),
+        code: null,
+        codeExpires: 0,
+        audit: audit
+      }
+    };
+    renderFamilyReport();
+    showToast("已删除；凭证 " + receipt);
+    addTrace({ tool: "privacy.delete", title: "删除今日数据", detail: "报告/告警/用药已清空；授权已撤回；凭证 " + receipt });
   }
 
   function notifyFamily(text) {
