@@ -35,7 +35,7 @@
 <div class="wrap">
   <header>
     <h1>潮汕 / 客家 短句录音台</h1>
-    <p>用本地口音把普通话提示自然讲一遍；录音只存本机，不上传。</p>
+    <p>用本地口音把普通话提示自然讲一遍；录音自动存本机 IndexedDB，不上传；仍需下载备份。</p>
   </header>
 
   <div class="card">
@@ -45,6 +45,7 @@
       <label for="speaker">发音人</label>
       <input id="speaker" placeholder="如：汕头阿婆/梅县阿伯" style="font:inherit;font-size:13px;padding:7px 9px;border:1px solid #cfdedb;border-radius:9px;min-width:180px">
       <button id="stop" class="danger" disabled>停止录音</button>
+      <button id="clear">清空本机录音</button>
     </div>
     <div class="warn">录音前请确认：安静房间、手机外放/麦克风、发音人同意用于产品测试；不要录姓名、住址、病历号。</div>
     <div id="done" class="done" hidden>本句已录好，可试听/下载；建议每条 3–8 秒。</div>
@@ -91,6 +92,54 @@
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const state = { recorder:null, chunks:[], current:null, stream:null, blobs:{} };
+  let dbPromise = null;
+  function openDB(){
+    if (!window.indexedDB) return Promise.reject(new Error("浏览器不支持 IndexedDB"));
+    if (!dbPromise) {
+      dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open("carekeeper_dialect_record", 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore("recordings", {keyPath:"key"}); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    return dbPromise;
+  }
+  function loadSaved(){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction("recordings", "readonly");
+      const req = tx.objectStore("recordings").getAll();
+      req.onsuccess = () => {
+        state.blobs = {};
+        const dialect = dialectLabel();
+        (req.result || []).forEach(item => {
+          if (item.dialect !== dialect) return;
+          const url = URL.createObjectURL(item.blob);
+          state.blobs[item.index] = {blob:item.blob, url:url, dialect:item.dialect, speaker:item.speaker, savedAt:item.created};
+        });
+        resolve();
+      };
+      req.onerror = () => reject(req.error);
+    })).catch(() => {});
+  }
+  function saveBlob(i, blob, dialect, speaker){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction("recordings", "readwrite");
+      tx.objectStore("recordings").put({key:dialect+"-"+(i+1), dialect:dialect, index:i, speaker:speaker, blob:blob, created:new Date().toISOString()});
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    })).catch(() => {});
+  }
+  function clearSaved(){
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction("recordings", "readwrite");
+      tx.objectStore("recordings").clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    })).catch(() => {});
+  }
+
+
   const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
   let timer = null, startedAt = 0;
 
@@ -102,8 +151,8 @@
     PROMPTS.forEach((text, i) => {
       const row = document.createElement("div"); row.className = "prompt";
       row.innerHTML = '<h3>第 '+(i+1)+' 句</h3><p>'+esc(text)+'</p>'+
-        '<div class="row"><button class="primary" data-rec="'+i+'">开始录</button><span class="status" id="st-'+i+'">未录</span></div>'+
-        '<div id="audio-'+i+'"></div>';
+        '<div class="row"><button class="primary" data-rec="'+i+'">开始录</button><span class="status" id="st-'+i+'">'+(state.blobs[i] ? '已存本机' : '未录')+'</span></div>'+
+        '<div id="audio-'+i+'">'+(state.blobs[i] ? '<audio controls src="'+state.blobs[i].url+'"></audio><div class="row" style="margin-top:5px"><a class="muted" href="'+state.blobs[i].url+'" download="'+dialectLabel()+'-'+String(i+1).padStart(2,"0")+'.webm">下载本句</a></div>' : '')+'</div>';
       list.appendChild(row);
     });
   }
@@ -125,8 +174,9 @@
       const url = URL.createObjectURL(blob);
       state.blobs[i] = {blob:blob, url:url, dialect:dialectLabel(), speaker:$("#speaker").value.trim()};
       const box = $("#audio-"+i); box.innerHTML = '<audio controls src="'+url+'"></audio><div class="row" style="margin-top:5px"><a class="muted" href="'+url+'" download="'+dialectLabel()+'-'+String(i+1).padStart(2,"0")+'.webm">下载本句</a></div>';
-      const st = $("#st-"+i); if (st) st.textContent = "已录 · " + Math.round(blob.size/1024) + "KB";
+      const st = $("#st-"+i); if (st) st.textContent = "已存本机 · " + Math.round(blob.size/1024) + "KB";
       $("#done").hidden = false;
+      saveBlob(i, blob, state.blobs[i].dialect, state.blobs[i].speaker);
       state.stream.getTracks().forEach(t=>t.stop());
     };
     state.recorder.start();
@@ -151,7 +201,8 @@
     const btn = e.target.closest("[data-rec]"); if (btn) start(Number(btn.dataset.rec));
   });
   $("#stop").addEventListener("click", stopRec);
-  $("#dialect").addEventListener("change", () => { state.blobs = {}; render(); $("#done").hidden = true; });
+  $("#dialect").addEventListener("change", () => { loadSaved().then(() => { render(); $("#done").hidden = true; }); });
+  $("#clear").addEventListener("click", () => { if (!confirm("清空本机所有录音？已下载的文件不受影响。")) return; clearSaved().then(() => { state.blobs = {}; render(); $("#done").hidden = true; }); });
   $("#export").addEventListener("click", () => {
     const rows = Object.entries(state.blobs).map(([i,v]) => ({index:Number(i)+1, dialect:v.dialect, speaker:v.speaker, file:dialectLabel()+"-"+String(Number(i)+1).padStart(2,"0")+".webm", size:v.blob.size}));
     const payload = { exportedAt:new Date().toISOString(), dialect:dialectLabel(), speaker:$("#speaker").value.trim(), recordings:rows };
@@ -159,7 +210,7 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "dialect-recordings.json"; a.click();
   });
 
-  render();
+  loadSaved().then(() => render());
 })();
 </script>
 </body>
