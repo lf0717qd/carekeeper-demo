@@ -270,7 +270,7 @@
     const btn = e.target.closest("[data-rec]"); if (btn) start(Number(btn.dataset.rec));
   });
   $("#stop").addEventListener("click", stopRec);
-  $("#dialect").addEventListener("change", () => { loadSaved().then(() => { render(); $("#done").hidden = true; }); });
+  $("#dialect").addEventListener("change", () => { render(); loadSaved().then(() => { render(); $("#done").hidden = true; }); });
   $("#bundle").addEventListener("click", () => { bundleAll().catch(e => alert("打包失败：" + e.message)); });
   $("#clear").addEventListener("click", () => { if (!confirm("清空本机所有录音？已下载的文件不受影响。")) return; clearSaved().then(() => { state.blobs = {}; render(); $("#done").hidden = true; }); });
 
@@ -302,6 +302,7 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "dialect-recordings.json"; a.click();
   });
 
+  render();
   loadSaved().then(() => render());
 })();
 </script>
