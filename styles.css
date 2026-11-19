@@ -841,6 +841,38 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+.ai-badge {
+  display: inline-block; vertical-align: middle; margin-left: 5px;
+  padding: 2px 6px; border-radius: 999px;
+  background: #e8f3f0; color: var(--teal);
+  font-family: var(--sans); font-size: 8.5px; font-weight: 600;
+  letter-spacing: .02em; border: 1px solid #cfe5d6;
+}
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15, 40, 45, .42);
+  display: grid; place-items: center; padding: 18px;
+  backdrop-filter: blur(2px);
+}
+.confirm-card {
+  width: min(420px, 100%);
+  background: #fffdf8; color: var(--ink);
+  border: 1px solid #dce8e5; border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(10, 40, 45, .25);
+  padding: 20px 20px 16px;
+  animation: slideIn .18s ease both;
+}
+.confirm-card h3 { margin: 0 0 6px; font-size: 17px; color: var(--ink); }
+.confirm-card p { margin: 0; font-size: 12.5px; line-height: 1.65; color: #52676a; white-space: pre-wrap; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.confirm-actions button {
+  font-family: var(--sans); font-size: 12px; border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; border: 1px solid #d4e2df; background: #fff; color: var(--teal);
+}
+.confirm-actions button.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+.confirm-actions button.danger { background: #b23a2b; color: #fff; border-color: #b23a2b; }
+
+
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
