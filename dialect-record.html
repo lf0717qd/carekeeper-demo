@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>潮汕 / 客家 短句录音台 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.65}
+  .wrap{max-width:980px;margin:0 auto;padding:22px 16px 60px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:22px 24px}
+  header h1{margin:0 0 4px;font-size:23px}
+  header p{margin:0;font-size:12px;opacity:.85}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-top:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label{font-size:12px;color:#3c5a5e}
+  select,button{font:inherit;font-size:13px;border-radius:9px;padding:7px 10px;border:1px solid #cfdedb;background:#fff;color:var(--ink)}
+  button{cursor:pointer}button.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+  button.danger{background:#b23a2b;color:#fff;border-color:#b23a2b}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .muted{color:var(--muted);font-size:11px}
+  .prompt{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-top:9px;background:#fff}
+  .prompt h3{margin:0 0 4px;font-size:13px}
+  .prompt p{margin:0 0 7px;font-size:13px;color:#3f5558}
+  .status{font-size:11px;color:var(--muted);margin-top:5px}
+  .rec{background:#fff1ec;color:#b23a2b;border-color:#f0c7bd}
+  audio{width:100%;margin-top:7px}
+  .warn{background:#fff4e8;border:1px solid #efd8c3;color:#7a5438;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:10px}
+  .done{background:#eef8f2;border:1px solid #cfe5d6;color:#2f5f45;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:10px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>潮汕 / 客家 短句录音台</h1>
+    <p>用本地口音把普通话提示自然讲一遍；录音只存本机，不上传。</p>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <label for="dialect">方言</label>
+      <select id="dialect"><option value="teochew">潮汕话</option><option value="hakka">客家话</option></select>
+      <label for="speaker">发音人</label>
+      <input id="speaker" placeholder="如：汕头阿婆/梅县阿伯" style="font:inherit;font-size:13px;padding:7px 9px;border:1px solid #cfdedb;border-radius:9px;min-width:180px">
+      <button id="stop" class="danger" disabled>停止录音</button>
+    </div>
+    <div class="warn">录音前请确认：安静房间、手机外放/麦克风、发音人同意用于产品测试；不要录姓名、住址、病历号。</div>
+    <div id="done" class="done" hidden>本句已录好，可试听/下载；建议每条 3–8 秒。</div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><strong>12 句高频照护话术</strong><div class="muted">普通话提示；请用方言自然翻译，不要逐字硬读。</div></div>
+      <button id="export" class="primary">导出录音清单</button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="card">
+    <strong>录制要求</strong>
+    <ul class="muted" style="margin:6px 0 0;padding-left:18px">
+      <li>每条 3–8 秒；语速比平时慢一点；不要喊。</li>
+      <li>同一方言尽量同一发音人，音色/口音一致。</li>
+      <li>数字、日期要按方言自然说法；不要用普通话数字硬读。</li>
+      <li>录完下载，文件名会自动带方言/序号。</li>
+      <li>录音只用于本项目 L1 短句库；使用前需发音人书面同意。</li>
+    </ul>
+  </div>
+
+  <footer>乡音健康管家 · 潮汕/客家 L1 短句库 · 录音台不是 TTS 模型</footer>
+</div>
+
+<script>
+(function(){
+  const PROMPTS = [
+    "婆婆，你今天血压有点高，先坐下休息十分钟，再量一次。",
+    "药要按药袋上的说明吃，不要自己加药或停药。",
+    "如果胸口痛、喘不过气，马上叫家人并打120。",
+    "下周三上午九点复诊，带身份证、医保卡和血压记录。",
+    "今晚八点记得吃晚上的药，吃完喝一杯温水。",
+    "伤口要保持干净干爽；如果红肿、流脓、有臭味，要马上看医生。",
+    "血糖低的时候，如果人是清醒的，先吃一点糖或糖水，再测一次。",
+    "跌倒后如果起不来，不要硬撑，叫家人并打120。",
+    "我是乡音健康管家，只做健康教育和就医提醒，不诊断、不开药。",
+    "你慢慢讲，我听得明；你今天哪里不舒服？",
+    "今天有没有按时吃药？有没有漏服？",
+    "如果出现胸痛、呼吸困难、意识不清，不要等，立即叫120。"
+  ];
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+  const state = { recorder:null, chunks:[], current:null, stream:null, blobs:{} };
+  const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  let timer = null, startedAt = 0;
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  function dialectLabel(){ return $("#dialect").value === "teochew" ? "潮汕话" : "客家话"; }
+
+  function render(){
+    const list = $("#list"); list.innerHTML = "";
+    PROMPTS.forEach((text, i) => {
+      const row = document.createElement("div"); row.className = "prompt";
+      row.innerHTML = '<h3>第 '+(i+1)+' 句</h3><p>'+esc(text)+'</p>'+
+        '<div class="row"><button class="primary" data-rec="'+i+'">开始录</button><span class="status" id="st-'+i+'">未录</span></div>'+
+        '<div id="audio-'+i+'"></div>';
+      list.appendChild(row);
+    });
+  }
+
+  async function start(i){
+    if (!supported){ alert("当前浏览器不支持录音；请用 Chrome/Edge/Safari（HTTPS 或 localhost）。"); return; }
+    if (state.recorder && state.recorder.state === "recording") stopRec();
+    $("#done").hidden = true;
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    } catch(e){ alert("麦克风未授权：" + e.message); return; }
+    state.chunks = []; state.current = i;
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+    state.recorder = mime ? new MediaRecorder(state.stream, {mimeType:mime}) : new MediaRecorder(state.stream);
+    state.recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) state.chunks.push(ev.data); };
+    state.recorder.onstop = () => {
+      const type = state.recorder.mimeType || "audio/webm";
+      const blob = new Blob(state.chunks, {type:type});
+      const url = URL.createObjectURL(blob);
+      state.blobs[i] = {blob:blob, url:url, dialect:dialectLabel(), speaker:$("#speaker").value.trim()};
+      const box = $("#audio-"+i); box.innerHTML = '<audio controls src="'+url+'"></audio><div class="row" style="margin-top:5px"><a class="muted" href="'+url+'" download="'+dialectLabel()+'-'+String(i+1).padStart(2,"0")+'.webm">下载本句</a></div>';
+      const st = $("#st-"+i); if (st) st.textContent = "已录 · " + Math.round(blob.size/1024) + "KB";
+      $("#done").hidden = false;
+      state.stream.getTracks().forEach(t=>t.stop());
+    };
+    state.recorder.start();
+    startedAt = Date.now();
+    $("#stop").disabled = false;
+    const st = $("#st-"+i); if (st){ st.textContent = "录音中…"; st.className = "status rec"; }
+    clearInterval(timer);
+    timer = setInterval(() => {
+      const s = Math.floor((Date.now()-startedAt)/1000);
+      const el = $("#st-"+state.current); if (el) el.textContent = "录音中 " + s + "s（建议3–8s）";
+      if (s >= 15) stopRec();
+    }, 250);
+  }
+
+  function stopRec(){
+    clearInterval(timer);
+    if (state.recorder && state.recorder.state !== "inactive") state.recorder.stop();
+    $("#stop").disabled = true;
+  }
+
+  $("#list").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-rec]"); if (btn) start(Number(btn.dataset.rec));
+  });
+  $("#stop").addEventListener("click", stopRec);
+  $("#dialect").addEventListener("change", () => { state.blobs = {}; render(); $("#done").hidden = true; });
+  $("#export").addEventListener("click", () => {
+    const rows = Object.entries(state.blobs).map(([i,v]) => ({index:Number(i)+1, dialect:v.dialect, speaker:v.speaker, file:dialectLabel()+"-"+String(Number(i)+1).padStart(2,"0")+".webm", size:v.blob.size}));
+    const payload = { exportedAt:new Date().toISOString(), dialect:dialectLabel(), speaker:$("#speaker").value.trim(), recordings:rows };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "dialect-recordings.json"; a.click();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
