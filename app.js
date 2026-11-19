@@ -97,6 +97,9 @@
     if (params.get("static") === "1") {
       document.body.classList.add("static");
     }
+    if (params.get("tab") === "family") {
+      switchTab("family");
+    }
     const demoParam = params.get("demo");
     if (demoParam && scenarioUserText[demoParam]) {
       setTimeout(() => startScenario(demoParam), 700);
@@ -477,8 +480,10 @@
 
   async function runEmergency(fromBP = false) {
     setAlert(true);
-    state.familyReport.alerts += 1;
-    state.familyReport.alertText = "胸痛 + 出冷汗 + 气促：已按红线升级，模拟通知家属并转人工/120。";
+    const familyState = ensureFamilyState();
+    familyState.alerts += 1;
+    familyState.alertText = "胸痛 + 出冷汗 + 气促：已按红线升级，模拟通知家属并转人工/120。";
+    familyState.alertsList.unshift({ time: nowTime(), text: familyState.alertText, handled: false });
     addTrace({ tool: "triage.red_flag", title: "红线命中", detail: "胸痛 + 出冷汗 + 气促 → 立即升级", tone: "danger" });
     setStage("decide");
     addTrace({ tool: "escalate.120", title: "紧急升级", detail: "保持在线；模拟生成急救工单；提示不要自行走动", tone: "danger" });
@@ -1203,50 +1208,194 @@
   }
 
   // ---------- family report ----------
+  function familyToday() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
+  function ensureFamilyState() {
+    const r = state.familyReport;
+    if (!r.access) {
+      r.access = {
+        authorized: true,
+        agent: "儿子陈先生",
+        scopes: ["查看今日报告", "接收红线告警", "复诊提醒"],
+        updated: familyToday()
+      };
+    }
+    if (!Array.isArray(r.alertsList)) r.alertsList = [];
+    if (!r.followup) {
+      r.followup = {
+        date: "2026-11-25 09:00",
+        dept: "社区医院二楼",
+        items: "身份证、医保卡、血压记录",
+        fasting: "不需要空腹"
+      };
+    }
+    return r;
+  }
+
+  function authCard(r) {
+    const scopes = (r.access.scopes || []).map((x) => "<span class='auth-scope'>" + escapeHTML(x) + "</span>").join("");
+    return '<div class="family-auth">' +
+      '<div><span class="auth-pill">已授权</span> <strong>' + escapeHTML(r.access.agent) + '</strong>' +
+      '<div class="auth-scopes">' + scopes + '</div>' +
+      '<small>授权时间：' + escapeHTML(r.access.updated) + ' · 老人可随时撤回</small></div>' +
+      '<button class="small-btn ghost" id="familyRevoke">撤回授权</button>' +
+      '</div>';
+  }
+
+  function lockedCard() {
+    return '<div class="family-locked">' +
+      '<div class="lock-icon">锁</div>' +
+      '<h4>未授权，家属看不到报告</h4>' +
+      '<p>需要老人授权后，家属才能查看今日报告、接收红线告警、查看复诊提醒。</p>' +
+      '<button class="small-btn" id="familyAuthorize">模拟老人授权</button>' +
+      '<p class="muted tiny">演示：真实产品需要老人短信/人脸/现场确认，并记录授权与撤回。</p>' +
+      '</div>';
+  }
+
+  function alertsHTML(r) {
+    if (!r.alertsList.length) return '<div class="report-alert good">今日未出现红线；继续观察血压与用药。</div>';
+    return '<div class="alert-list">' + r.alertsList.map((a, i) =>
+      '<div class="alert-item ' + (a.handled ? "handled" : "") + '">' +
+      '<div><strong>' + (a.handled ? "已处理" : "待处理") + '</strong> · ' + escapeHTML(a.time) + '<br>' + escapeHTML(a.text) + '</div>' +
+      (a.handled ? '<span class="muted">已确认</span>' : '<button class="small-btn" data-alert-index="' + i + '">标记已处理</button>') +
+      '</div>').join("") + '</div>';
+  }
+
+  function medsHTML() {
+    const rows = profile.meds.map((m) =>
+      '<tr><td>' + escapeHTML(m.name) + '</td><td>' + escapeHTML(m.dose) + '</td><td>' + escapeHTML(m.when) + '</td></tr>').join("");
+    return '<table class="med-table"><thead><tr><th>通用名</th><th>规格</th><th>用法</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<p class="muted tiny">只读清单；不调剂量、不建议换药。具体以药袋/医生医嘱为准。</p>';
+  }
+
+  function receiptHTML(r) {
+    return '<div class="receipt-paper">' +
+      '<h1>今日照护回执</h1>' +
+      '<p class="receipt-date">' + escapeHTML(r.date) + ' · 乡音健康管家</p>' +
+      '<h2>今日摘要</h2><p>' + escapeHTML(r.summary) + '</p>' +
+      '<h2>血压 / 用药</h2><p>血压：' + escapeHTML(r.bp) + '；用药完成：' + escapeHTML(r.med) + '。</p>' +
+      '<h2>复诊</h2><p>' + escapeHTML(r.followup.date) + ' · ' + escapeHTML(r.followup.dept) + '；带：' + escapeHTML(r.followup.items) + '；' + escapeHTML(r.followup.fasting) + '。</p>' +
+      '<h2>下一步</h2><ul>' + r.notes.map((n) => '<li>' + escapeHTML(n) + '</li>').join("") + '</ul>' +
+      '<h2>红线</h2><p>' + (r.alertText ? escapeHTML(r.alertText) : "今日未出现红线。") + '</p>' +
+      '<p class="receipt-foot">本回执只用于健康教育/照护提醒，不是诊断、处方或病历。</p>' +
+      '</div>';
+  }
+
+  function doctorSummaryHTML(r) {
+    return '<div class="doctor-paper">' +
+      '<h1>医生只读摘要</h1>' +
+      '<p class="muted">仅用于试点沟通；不可开药、不可改写病历、不替代医生判断。</p>' +
+      '<h2>基本信息</h2><p>' + escapeHTML(profile.name) + '，' + profile.age + ' 岁，' + escapeHTML(profile.area) + '；诊断：' + escapeHTML(profile.conditions.join("、")) + '。</p>' +
+      '<h2>今日情况</h2><p>' + escapeHTML(r.summary) + ' 血压：' + escapeHTML(r.bp) + '；用药：' + escapeHTML(r.med) + '。</p>' +
+      '<h2>红线/告警</h2><p>' + (r.alertText ? escapeHTML(r.alertText) : "今日未出现红线。") + '</p>' +
+      '<h2>复诊</h2><p>' + escapeHTML(r.followup.date) + ' · ' + escapeHTML(r.followup.dept) + '；带：' + escapeHTML(r.followup.items) + '。</p>' +
+      '<h2>在服药物（只读）</h2>' + medsHTML() +
+      '<h2>来源</h2><p>KB v0.2；回答带 citations；规则层优先。</p>' +
+      '</div>';
+  }
+
+  function openPrintWindow(title, body, cls) {
+    const w = window.open("", "_blank", "width=760,height=920");
+    if (!w) {
+      showToast("浏览器拦截了打印窗口，请允许弹窗");
+      return;
+    }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHTML(title) + '</title>' +
+      '<style>body{font-family:"Microsoft YaHei",sans-serif;color:#17363d;padding:28px;line-height:1.7}' +
+      'h1{font-size:26px}h2{font-size:19px;margin-top:20px;border-left:4px solid #e07a3f;padding-left:8px}' +
+      'p,li{font-size:16pt}table{width:100%;border-collapse:collapse;font-size:14pt}' +
+      'th,td{border:1px solid #cfdedb;padding:6px;text-align:left}' +
+      '.muted{color:#6b7b7d;font-size:14px}.receipt-foot{font-size:13px;color:#7a5a3a;border-top:1px dashed #d8c3a5;padding-top:10px}' +
+      (cls === "doctor" ? 'body{background:#f7fbfa}' : '') + '</style></head><body>' + body + '</body></html>');
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 350);
+  }
+
   function renderFamilyReport() {
     const root = $("#familyReport");
-    const r = state.familyReport;
-    const alertText = r.alertText
-      ? '<div class="report-alert">' + escapeHTML(r.alertText) + "</div>"
-      : '<div class="report-alert good">今日未出现红线；继续观察血压与用药。</div>';
+    if (!root) return;
+    const r = ensureFamilyState();
+
+    if (!r.access.authorized) {
+      root.innerHTML = lockedCard();
+      const auth = $("#familyAuthorize");
+      if (auth) auth.addEventListener("click", () => {
+        r.access.authorized = true;
+        r.access.updated = familyToday();
+        renderFamilyReport();
+        showToast("已模拟老人授权");
+      });
+      return;
+    }
+
     const messages = r.messages.length
       ? r.messages.map((m) => '<div class="family-message"><div class="fm-avatar">乡</div><div><strong>已发送给家属</strong><br>' + escapeHTML(m.text) + '<br><span class="muted">' + escapeHTML(m.time) + "</span></div></div>").join("")
-      : '<p class="muted" style="font-size:10.5px;">还没有发送记录。点右上角「模拟发送给家属」。</p>';
+      : '<p class="muted tiny">还没有发送记录。点下面「发送今日报告」。</p>';
 
-    let html = "";
+    let html = authCard(r);
     html += '<div class="report-card">';
     html += '<div class="report-top">';
     html += '<div class="report-kicker">FAMILY REPORT · ' + escapeHTML(r.date) + '</div>';
     html += '<h4>陈婆婆今日照护报告</h4>';
     html += '<p>乡音健康管家 · 粤语优先 · 自动汇总</p>';
-    html += '</div>';
-    html += '<div class="report-body">';
+    html += '</div><div class="report-body">';
     html += '<div class="report-metrics">';
     html += '<div class="report-metric"><strong>' + escapeHTML(r.bp) + '</strong><span>血压（复测后）</span></div>';
     html += '<div class="report-metric"><strong>' + escapeHTML(r.med) + '</strong><span>用药完成</span></div>';
     html += '<div class="report-metric"><strong>' + r.alerts + '</strong><span>红线告警</span></div>';
     html += '</div>';
     html += '<div class="report-section"><h5>今日摘要</h5><p>' + escapeHTML(r.summary) + '</p></div>';
-    html += alertText;
+    html += '<div class="report-section"><h5>红线告警</h5>' + alertsHTML(r) + '</div>';
+    html += '<div class="report-section"><h5>复诊提醒</h5><p><strong>' + escapeHTML(r.followup.date) + '</strong> · ' + escapeHTML(r.followup.dept) + '<br>带：' + escapeHTML(r.followup.items) + '；' + escapeHTML(r.followup.fasting) + '</p></div>';
+    html += '<div class="report-section"><h5>在服药物（只读）</h5>' + medsHTML() + '</div>';
     html += '<div class="report-section"><h5>家属可以做什么</h5><ul>';
     r.notes.forEach((n) => { html += '<li>' + escapeHTML(n) + '</li>'; });
     html += '</ul></div>';
-    html += '<div class="report-actions">';
-    html += '<button class="small-btn" id="reportSend">模拟发送给家属</button>';
-    html += '<button class="small-btn" id="reportCall">模拟回电</button>';
+    html += '<div class="family-actions">';
+    html += '<button class="small-btn" id="familySend">发送今日报告</button>';
+    html += '<button class="small-btn ghost" id="familyPrint">打印大字回执</button>';
+    html += '<button class="small-btn ghost" id="familyDoctor">医生只读摘要</button>';
     html += '</div>';
     html += '<div id="familyMessages">' + messages + '</div>';
     html += '</div></div>';
     root.innerHTML = html;
 
-    const send = $("#reportSend");
+    const revoke = $("#familyRevoke");
+    if (revoke) revoke.addEventListener("click", () => {
+      r.access.authorized = false;
+      renderFamilyReport();
+      showToast("已撤回授权，家属端已锁定");
+      addTrace({ tool: "consent.revoke", title: "撤回授权", detail: "家属端立即锁定；不再发送报告/告警" });
+    });
+    const send = $("#familySend");
     if (send) send.addEventListener("click", () => { notifyFamily("已发送今日照护报告。"); showToast("已模拟发送到家属微信"); });
-    const call = $("#reportCall");
-    if (call) call.addEventListener("click", () => { notifyFamily("家属已回电（演示）。"); showToast("已模拟家属回电"); });
+    const print = $("#familyPrint");
+    if (print) print.addEventListener("click", () => openPrintWindow("今日照护回执", receiptHTML(r), "receipt"));
+    const doctor = $("#familyDoctor");
+    if (doctor) doctor.addEventListener("click", () => openPrintWindow("医生只读摘要", doctorSummaryHTML(r), "doctor"));
+    root.querySelectorAll("[data-alert-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const i = Number(btn.getAttribute("data-alert-index"));
+        if (r.alertsList[i]) r.alertsList[i].handled = true;
+        renderFamilyReport();
+        showToast("已标记处理");
+      });
+    });
   }
 
   function notifyFamily(text) {
-    state.familyReport.messages.push({ text, time: nowTime() });
+    const r = ensureFamilyState();
+    if (!r.access.authorized) {
+      addTrace({ tool: "consent.block", title: "未授权，已拦截", detail: text });
+      showToast("未授权，未发送给家属");
+      return;
+    }
+    r.messages.push({ text: text, time: nowTime() });
     renderFamilyReport();
     addTrace({ tool: "notify.family", title: "通知家属", detail: text });
     showToast("已模拟发送给家属");
