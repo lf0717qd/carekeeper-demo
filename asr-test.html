@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>粤语 ASR 老人录音测试台 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.65}
+  .wrap{max-width:980px;margin:0 auto;padding:22px 16px 60px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:22px 24px}
+  header h1{margin:0 0 4px;font-size:23px}
+  header p{margin:0;font-size:12px;opacity:.85}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-top:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  label{font-size:12px;color:#3c5a5e}
+  select,textarea,input,button{font:inherit;font-size:13px;border-radius:9px;border:1px solid #cfdedb;background:#fff;color:var(--ink);padding:7px 9px}
+  textarea{width:100%;min-height:54px;resize:vertical}
+  button{cursor:pointer}button.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+  button.rec{background:var(--orange);color:#fff;border-color:var(--orange)}button:disabled{opacity:.45;cursor:not-allowed}
+  .muted{color:var(--muted);font-size:11px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .metric{background:#f4f9f7;border:1px solid #e0ebe8;border-radius:10px;padding:8px}
+  .metric strong{display:block;font-size:18px;color:var(--teal)}.metric span{font-size:10px;color:var(--muted)}
+  .box{border:1px solid var(--line);border-radius:12px;padding:10px 11px;background:#fff;margin-top:8px;font-size:13px;white-space:pre-wrap;min-height:38px}
+  .warn{background:#fff4e8;border:1px solid #efd8c3;color:#7a5438;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:10px}
+  .ok{background:#eef8f2;border:1px solid #cfe5d6;color:#2f5f45}
+  .bad{background:#fff3f1;border:1px solid #f2c8c3;color:#7a1b13}
+  table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #dce8e5;padding:5px;text-align:left;vertical-align:top}th{background:#f4f9f7}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:20px}
+  @media(max-width:640px){.metrics{grid-template-columns:1fr 1fr}.wrap{padding:12px 10px 40px}header{padding:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>粤语 ASR 老人录音测试台</h1>
+    <p>录 5 秒 → 云端 GLM-ASR → 对照原文算 CER；数据只存本机。</p>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <label for="preset">测试句</label>
+      <select id="preset" style="min-width:260px;max-width:100%">
+        <option value="">自定义</option>
+        <option>我今日血压高</option>
+        <option>我食咗药未</option>
+        <option>我心口痛，出冷汗</option>
+        <option>我唞唔到气</option>
+        <option>我跌倒起唔到身</option>
+        <option>下星期三复诊</option>
+        <option>我血糖低</option>
+        <option>帮我叫家人</option>
+        <option>我唔想食饭</option>
+        <option>我个仔打我</option>
+      </select>
+    </div>
+    <label for="reference" style="display:block;margin-top:8px">原文（老人实际说的字，用于算 CER）</label>
+    <textarea id="reference" placeholder="例：我今日血压高"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="record" class="rec">开始录 5 秒</button>
+      <button id="stop" disabled>停止</button>
+      <span id="status" class="muted">未开始</span>
+      <button id="export" class="primary">导出结果</button>
+    </div>
+    <div class="warn">请用老人真实粤语，不要照着普通话读；安静房间；录音只在本页，不上传除 ASR 外的任何地方。不要录姓名/住址/病历号。</div>
+  </div>
+
+  <div class="card">
+    <div class="metrics">
+      <div class="metric"><strong id="mCer">—</strong><span>本句 CER</span></div>
+      <div class="metric"><strong id="mCount">0</strong><span>已测句数</span></div>
+      <div class="metric"><strong id="mAvg">—</strong><span>平均 CER</span></div>
+    </div>
+    <div class="muted">识别结果</div>
+    <div class="box" id="hyp">—</div>
+    <audio id="player" controls style="width:100%;margin-top:8px;display:none"></audio>
+    <div id="verdict" class="warn" hidden></div>
+  </div>
+
+  <div class="card">
+    <strong>结果记录</strong>
+    <div class="muted">只存本机 localStorage；导出 JSON 给项目组。</div>
+    <div style="overflow:auto"><table><thead><tr><th>#</th><th>原文</th><th>识别</th><th>CER</th><th>时长</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <strong>判定</strong>
+    <ul class="muted" style="margin:6px 0 0;padding-left:18px">
+      <li>CER ≤10%：可用；10–20%：需复述确认；>20%：不可上线。</li>
+      <li>先跑 30–50 条 70+ 老人粤语，再谈 600 条盲测。</li>
+      <li>微信内置浏览器可能不支持录音；用 Chrome/Safari。</li>
+      <li>本页只做技术测试，不替代临床/合规评估。</li>
+    </ul>
+  </div>
+
+  <footer>乡音健康管家 · 粤语 ASR 测试 · 不是诊断工具</footer>
+</div>
+
+<script>
+(function(){
+  const API = "https://carekeeper-api-fvxlqjiadh.cn-hangzhou.fcapp.run/api/asr";
+  const KEY = "carekeeper_asr_test_v1";
+  const $ = (s) => document.querySelector(s);
+  const state = { results: load(), recorder:null, chunks:[], stream:null, startAt:0, lastBlob:null };
+  let timer = null;
+
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch(e){ return []; } }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state.results)); }
+  function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  function norm(s){ return String(s || "").replace(/[\s，。！？、；：,.!?;:]/g, ""); }
+  function cer(ref, hyp){
+    const a = Array.from(norm(ref)), b = Array.from(norm(hyp));
+    if (!a.length) return 0;
+    const dp = Array.from({length:a.length+1}, (_,i)=>[i]);
+    for (let j=0;j<=b.length;j++) dp[0][j]=j;
+    for (let i=1;i<=a.length;i++) for (let j=1;j<=b.length;j++){
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+    return dp[a.length][b.length] / a.length;
+  }
+  function fmtPct(n){ return (n*100).toFixed(1) + "%"; }
+  function updateSummary(){
+    $("#mCount").textContent = state.results.length;
+    const avg = state.results.length ? state.results.reduce((s,r)=>s+r.cer,0)/state.results.length : null;
+    $("#mAvg").textContent = avg==null ? "—" : fmtPct(avg);
+  }
+  function renderRows(){
+    const body = $("#rows"); body.innerHTML = state.results.slice().reverse().map((r,i)=>
+      '<tr><td>'+state.results.length-i+'</td><td>'+esc(r.ref)+'</td><td>'+esc(r.hyp)+'</td><td>'+fmtPct(r.cer)+'</td><td>'+Math.round(r.duration/1000)+'s</td></tr>').join("");
+    updateSummary();
+  }
+  function encodeWav(audioBuffer){
+    const channels=audioBuffer.numberOfChannels, sampleRate=audioBuffer.sampleRate, length=audioBuffer.length;
+    const bytesPerSample=2, blockAlign=bytesPerSample, dataSize=length*blockAlign;
+    const buffer=new ArrayBuffer(44+dataSize), view=new DataView(buffer);
+    const writeStr=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+    writeStr(0,"RIFF");view.setUint32(4,36+dataSize,true);writeStr(8,"WAVE");writeStr(12,"fmt ");
+    view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);
+    view.setUint32(28,sampleRate*blockAlign,true);view.setUint16(32,blockAlign,true);view.setUint16(34,16,true);
+    writeStr(36,"data");view.setUint32(40,dataSize,true);
+    const data=[];for(let c=0;c<channels;c++)data.push(audioBuffer.getChannelData(c));
+    let off=44;
+    for(let i=0;i<length;i++){let s=0;for(let c=0;c<channels;c++)s+=data[c][i];s/=channels;s=Math.max(-1,Math.min(1,s));view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2;}
+    return buffer;
+  }
+  function b64(buf){
+    const bytes=new Uint8Array(buf);let bin="";const chunk=0x8000;
+    for(let i=0;i<bytes.length;i+=chunk)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+    return btoa(bin);
+  }
+  async function recognize(blob, duration){
+    $("#status").textContent = "识别中…";
+    try{
+      const ab = await blob.arrayBuffer();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const audio = await ctx.decodeAudioData(ab.slice(0)); await ctx.close();
+      const wav = encodeWav(audio);
+      const res = await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64(wav),mime:"audio/wav"})});
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || ("HTTP "+res.status));
+      const hyp = String(data.text || "").trim();
+      if(!hyp) throw new Error("ASR 返回空文本");
+      const ref = $("#reference").value.trim();
+      const c = ref ? cer(ref,hyp) : 0;
+      $("#hyp").textContent = hyp;
+      $("#mCer").textContent = ref ? fmtPct(c) : "—";
+      const v = $("#verdict"); v.hidden=false;
+      v.className = "warn " + (c<=0.1?"ok":(c<=0.2?"":"bad"));
+      v.textContent = ref ? (c<=0.1?"CER ≤10%，可用":(c<=0.2?"CER 10–20%，需复述确认":"CER >20%，不可直接上线")) : "未填原文，无法算 CER";
+      state.results.push({ref:ref||"(未填)", hyp:hyp, cer:c, duration:duration, at:new Date().toISOString(), latency:data.latency_ms||0});
+      save(); renderRows();
+      $("#status").textContent = "完成 · " + (data.latency_ms||0) + "ms";
+    }catch(e){
+      $("#status").textContent = "识别失败";
+      const v=$("#verdict");v.hidden=false;v.className="warn bad";v.textContent="ASR 失败：" + String(e).slice(0,120);
+    }
+  }
+  async function start(){
+    if(!navigator.mediaDevices || !window.MediaRecorder){ alert("当前浏览器不支持录音，请用 Chrome/Safari（HTTPS）"); return; }
+    try{ state.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); }
+    catch(e){ alert("麦克风未授权：" + e.message); return; }
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+    state.recorder = mime ? new MediaRecorder(state.stream,{mimeType:mime}) : new MediaRecorder(state.stream);
+    state.chunks=[]; state.startAt=Date.now();
+    state.recorder.ondataavailable = e => { if(e.data && e.data.size) state.chunks.push(e.data); };
+    state.recorder.onstop = () => {
+      clearInterval(timer);
+      const type = state.recorder.mimeType || "audio/webm";
+      const blob = new Blob(state.chunks,{type:type});
+      state.lastBlob = blob;
+      const duration = Date.now()-state.startAt;
+      const url = URL.createObjectURL(blob);
+      const p=$("#player"); p.src=url; p.style.display="block";
+      $("#record").disabled=false; $("#stop").disabled=true;
+      if(state.stream) state.stream.getTracks().forEach(t=>t.stop());
+      recognize(blob,duration);
+    };
+    state.recorder.start();
+    $("#record").disabled=true; $("#stop").disabled=false;
+    $("#status").textContent="录音中… 5秒";
+    timer=setInterval(()=>{const s=Math.floor((Date.now()-state.startAt)/1000);$("#status").textContent="录音中 "+s+"s / 5s";if(s>=5)stop();},200);
+  }
+  function stop(){ clearInterval(timer); if(state.recorder && state.recorder.state!=="inactive") state.recorder.stop(); }
+  $("#record").addEventListener("click",start);
+  $("#stop").addEventListener("click",stop);
+  $("#preset").addEventListener("change",()=>{$("#reference").value=$("#preset").value;});
+  $("#export").addEventListener("click",()=>{
+    const payload={exportedAt:new Date().toISOString(),ua:navigator.userAgent,results:state.results};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="asr-test-results.json";a.click();
+  });
+  renderRows();
+})();
+</script>
+</body>
+</html>
