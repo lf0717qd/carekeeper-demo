@@ -200,13 +200,14 @@
   }
 
   async function agentReply(text, opts = {}) {
-    const { trace = [], options = [], delay = 620, speakText = true } = opts;
+    const { trace = [], options = [], delay = 620, speakText = true, citations = [] } = opts;
     clearOptions();
     showTyping();
     setStage("act");
     await sleep(delay);
     hideTyping();
-    addMessage("agent", text);
+    const wrap = addMessage("agent", text);
+    appendCitations(wrap, citations);
     state.history.push({ role: "assistant", content: text });
     state.history = state.history.slice(-10);
     if (speakText) maybeSpeak(text);
@@ -214,6 +215,18 @@
     if (options.length) showOptions(options);
     setStage("reflect");
     setTimeout(() => setStage("idle"), 900);
+  }
+
+
+  function appendCitations(wrap, citations) {
+    const unique = [...new Set((citations || []).filter(Boolean))];
+    if (!unique.length) return;
+    const bubbleWrap = wrap.querySelector(".bubble-wrap");
+    if (!bubbleWrap) return;
+    const box = document.createElement("div");
+    box.className = "citations";
+    box.textContent = "来源：" + unique.slice(0, 3).join("；");
+    bubbleWrap.appendChild(box);
   }
 
   function showOptions(options) {
@@ -649,7 +662,7 @@
     return { wrap, bubble, meta };
   }
 
-  function finishAgentStream(stream, text) {
+  function finishAgentStream(stream, text, citations = []) {
     stream.bubble.classList.remove("streaming");
     stream.bubble.textContent = text;
     const speaker = document.createElement("button");
@@ -657,6 +670,7 @@
     speaker.innerHTML = '<svg><use href="#i-speaker"></use></svg>粤语播报';
     speaker.addEventListener("click", () => speak(text));
     stream.meta.appendChild(speaker);
+    appendCitations(stream.wrap, citations);
     state.lastAgentText = text;
     state.history.push({ role: "assistant", content: text });
     state.history = state.history.slice(-10);
@@ -727,7 +741,7 @@
         }
       }
       if (!full.trim()) throw new Error("empty stream");
-      finishAgentStream(stream, full);
+      finishAgentStream(stream, full, doneData && doneData.citations);
       addTrace({
         tool: "llm.complete",
         title: "LLM 流式完成",
@@ -795,6 +809,7 @@
       addTrace({ tool: "policy.guardrail", title: "安全兜底", detail: data.follow_up || "转家人/人工确认", tone: "warm" });
     }
     await agentReply(data.reply || "婆婆，我未系好听得明，可以讲多次吗？", {
+      citations: data.citations || [],
       options: data.needs_human
         ? [
             { label: "叫家人", action: async () => { notifyFamily("LLM 判断需要人工协助。"); await agentReply("好，我帮你叫家人。你等阵，唔使急。"); } },
