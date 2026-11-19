@@ -1611,11 +1611,11 @@
     let t = String(text || "");
     t = t.replace(/mmHg/gi, "毫米汞柱");
     t = t.replace(/mmol\s*\/\s*L/gi, "毫摩尔每升");
-    t = t.replace(/\bmg\b/gi, "毫克");
+    t = t.replace(/(\d+(?:\.\d+)?)\s*mg\b/gi, "$1毫克");
     t = t.replace(/℃/g, "度");
     t = t.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, (_, y, m, d) => y + "年" + Number(m) + "月" + Number(d) + "日");
     t = t.replace(/(\d{2,3})\s*\/\s*(\d{2,3})/g, "$1，$2");
-    t = t.replace(/%/g, "百分之");
+    t = t.replace(/(\d+(?:\.\d+)?)\s*%/g, "百分之$1");
     return t;
   }
 
