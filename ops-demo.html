@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运营 / 多站点 / 合规 / 成本 · 比赛演示</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8;--bad:#b23a2b;--good:#2f7d5b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.55}
+  .wrap{max-width:1200px;margin:0 auto;padding:20px 16px 50px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:20px 24px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  header h1{margin:0 0 4px;font-size:23px}header p{margin:0;font-size:12px;opacity:.85}
+  .badge{background:#fff4e8;color:#7a5438;border:1px solid #efd8c3;border-radius:999px;padding:4px 9px;font-size:10px;white-space:nowrap}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .tab{border:1px solid #d4e2df;background:#fff;color:var(--teal);border-radius:999px;padding:7px 12px;font:inherit;font-size:11px;cursor:pointer}
+  .tab.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .panel{display:none}.panel.on{display:block}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .stat{background:#f4f9f7;border:1px solid #e0ebe8;border-radius:12px;padding:10px}
+  .stat strong{display:block;font-family:var(--mono);font-size:22px;color:var(--teal)}.stat span{font-size:10px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border-bottom:1px solid #e8f0ee;padding:6px;text-align:left}th{background:#f4f9f7;color:#3c5a5e}
+  .pill{display:inline-block;padding:1px 6px;border-radius:999px;font-size:9px;border:1px solid #dce8e5;background:#f4f9f7;color:#52676a}
+  .pill.good{background:#eef8f2;border-color:#cfe5d6;color:#2f5f45}
+  .pill.bad{background:#fff3f1;border-color:#f2c8c3;color:#7a1b13}
+  .site{background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px}
+  .site h3{margin:0 0 3px;font-size:14px}.site p{margin:2px 0;font-size:10.5px;color:#52676a}
+  .site .tag{font-size:9px;color:var(--muted)}
+  .check{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed #e8f0ee;font-size:11px}
+  .check:last-child{border:0}
+  .calc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{font-size:11px;color:#3c5a5e;display:block;margin-top:5px}
+  input{width:100%;font:inherit;font-size:12px;padding:6px 8px;border:1px solid #cfdedb;border-radius:8px}
+  .result{background:#0f4c5c;color:#fff9ef;border-radius:12px;padding:14px;margin-top:10px}
+  .result strong{display:block;font-size:26px;font-family:var(--mono)}
+  .muted{color:var(--muted);font-size:10px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+  @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.calc{grid-template-columns:1fr}header{padding:16px}.wrap{padding:12px 10px 40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>运营 / 多站点 / 合规 / 成本</h1><p>比赛演示口径：数据为合成，不代表生产系统</p></div>
+    <span class="badge">演示数据 · 可用于答辩</span>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="ops">运营看板</button>
+    <button class="tab" data-tab="sites">多站点</button>
+    <button class="tab" data-tab="compliance">合规与审计</button>
+    <button class="tab" data-tab="cost">成本测算</button>
+  </div>
+
+  <section id="ops" class="panel on">
+    <div class="grid">
+      <div class="stat"><strong>128</strong><span>今日会话</span></div>
+      <div class="stat"><strong>6</strong><span>红线告警</span></div>
+      <div class="stat"><strong>30</strong><span>待人工审核</span></div>
+      <div class="stat"><strong>1</strong><span>未闭环工单</span></div>
+    </div>
+    <div class="card"><strong>今日会话（演示）</strong>
+      <table><thead><tr><th>时间</th><th>老人</th><th>意图</th><th>风险</th><th>处理</th></tr></thead><tbody>
+        <tr><td>08:42</td><td>陈婆婆</td><td>血压高</td><td><span class="pill bad">medium</span></td><td>已复测，家属已回电</td></tr>
+        <tr><td>09:15</td><td>李伯</td><td>漏服药</td><td><span class="pill">low</span></td><td>已提醒，未补服</td></tr>
+        <tr><td>10:03</td><td>陈婆婆</td><td>心口痛</td><td><span class="pill bad">high</span></td><td>已升级 120/家属</td></tr>
+        <tr><td>14:20</td><td>黄婆婆</td><td>复诊</td><td><span class="pill">low</span></td><td>已生成大字回执</td></tr>
+      </tbody></table>
+      <p class="muted">演示数据，不是真实患者；用于展示“问—办—查—评”运营闭环。</p>
+    </div>
+  </section>
+
+  <section id="sites" class="panel">
+    <div class="card"><strong>多站点配置（演示）</strong><p class="muted">同一套 Agent，按站点切换方言、知识库、红线策略和值班人。</p>
+      <div class="grid">
+        <div class="site"><h3>广州 · 荔湾</h3><p>粤语广府片</p><p>KB v0.2 / 394</p><p><span class="pill good">已配置</span></p><p class="tag">红线：120/家属/家医</p></div>
+        <div class="site"><h3>佛山 · 禅城</h3><p>粤语广府片</p><p>KB v0.2 + 佛山家庭病床</p><p><span class="pill good">已配置</span></p><p class="tag">政策卡：佛山医保</p></div>
+        <div class="site"><h3>汕头 · 金平</h3><p>潮汕话 L1</p><p>KB v0.2 + 潮汕短句</p><p><span class="pill">演示</span></p><p class="tag">外部 TTS，待盲听</p></div>
+        <div class="site"><h3>梅州 · 梅县</h3><p>客家话 L1</p><p>KB v0.2 + 客家短句</p><p><span class="pill">演示</span></p><p class="tag">外部 TTS，待盲听</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compliance" class="panel">
+    <div class="card"><strong>合规与审计（演示）</strong><p class="muted">不是正式等保/DPIA，只展示产品已留出的合规位。</p>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div>
+          <div class="check"><span>家属授权</span><span class="pill good">3 条</span></div>
+          <div class="check"><span>撤回授权</span><span class="pill good">1 条</span></div>
+          <div class="check"><span>删除数据凭证</span><span class="pill good">DEL-20261119-1815</span></div>
+          <div class="check"><span>审计日志</span><span class="pill good">留存 180 天（演示）</span></div>
+        </div>
+        <div>
+          <div class="check"><span>DPIA</span><span class="pill">模板已备，未评审</span></div>
+          <div class="check"><span>等保</span><span class="pill">未测评</span></div>
+          <div class="check"><span>数据出境</span><span class="pill">不承诺</span></div>
+          <div class="check"><span>患者数据</span><span class="pill good">Demo 全部合成</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cost" class="panel">
+    <div class="card"><strong>成本测算（模拟单价）</strong><p class="muted">单价为演示假设，不是厂商报价；用于答辩展示成本结构。</p>
+      <div class="calc">
+        <div>
+          <label>日会话数</label><input id="calls" type="number" value="100">
+          <label>平均 ASR 秒/次</label><input id="asr" type="number" value="15">
+          <label>平均 LLM 调用/次</label><input id="llm" type="number" value="3">
+          <label>平均 TTS 字符/次</label><input id="tts" type="number" value="300">
+        </div>
+        <div>
+          <label>ASR 单价（元/秒，模拟）</label><input id="pasr" type="number" step="0.0001" value="0.0003">
+          <label>LLM 单价（元/次，模拟）</label><input id="pllm" type="number" step="0.0001" value="0.002">
+          <label>TTS 单价（元/字符，模拟）</label><input id="ptts" type="number" step="0.00001" value="0.0001">
+          <label>&nbsp;</label><button id="calc" style="width:100%;font:inherit;padding:8px;border:0;border-radius:9px;background:var(--teal);color:#fff;cursor:pointer">重新计算</button>
+        </div>
+      </div>
+      <div class="result"><span>每月估算</span><strong id="monthly">—</strong><span id="detail" class="muted"></span></div>
+    </div>
+  </section>
+
+  <footer>乡音健康管家 · 比赛演示 · 合成数据 · 不诊断、不开药</footer>
+</div>
+<script>
+(function(){
+  const $=(s)=>document.querySelector(s);
+  document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach(x=>x.classList.remove("on"));
+    t.classList.add("on"); $("#"+t.dataset.tab).classList.add("on");
+  }));
+  function calc(){
+    const calls=+$("#calls").value||0, asr=+$("#asr").value||0, llm=+$("#llm").value||0, tts=+$("#tts").value||0;
+    const pasr=+$("#pasr").value||0, pllm=+$("#pllm").value||0, ptts=+$("#ptts").value||0;
+    const daily=calls*(asr*pasr+llm*pllm+tts*ptts);
+    const monthly=daily*30;
+    $("#monthly").textContent="¥ "+monthly.toFixed(2);
+    $("#detail").textContent="日 "+daily.toFixed(2)+" 元 · 按 30 天；ASR/LLM/TTS 合计，不含服务器/人力";
+  }
+  $("#calc").addEventListener("click",calc);
+  calc();
+})();
+</script>
+</body>
+</html>
