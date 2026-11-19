@@ -83,8 +83,9 @@
   async function init() {
     bindEvents();
     renderFamilyReport();
-    addMessage("agent", "婆婆，你好，我系乡音健康管家。你按一下讲嘢，或者直接同我讲。今日想讲咩？");
+    addMessage("agent", "婆婆，你好，我系智能助手，唔系真人。你按一下讲嘢，或者直接同我讲。今日想讲咩？");
     addTrace({ tool: "session.start", title: "会话开始", detail: "用户：陈婆婆；方言：粤语（广府片）；入口：老人端一屏" });
+    addTrace({ tool: "ai.identity", title: "AI 身份告知", detail: "开场白明确：智能助手，不是真人" });
     addTrace({ tool: "memory.load", title: "载入健康画像", detail: "高血压、2 型糖尿病；在服 2 种药；家属：儿子陈先生" });
     addTrace({ tool: "policy.load", title: "载入安全规则", detail: "胸痛 / 呼吸困难 / 意识改变 / 跌倒 / 低血糖 → 转人工或 120" });
     loadVoices();
@@ -140,7 +141,13 @@
       tab.addEventListener("click", () => switchTab(tab.dataset.tab));
     });
     $("#exportTrace").addEventListener("click", exportTrace);
-    $("#sendFamily").addEventListener("click", () => {
+    $("#sendFamily").addEventListener("click", async () => {
+      const ok = await confirmAction({
+        title: "发送今日报告给家属？",
+        message: "将发送今日摘要、血压、用药和复诊提醒；不会发送原始对话。",
+        confirmText: "发送报告"
+      });
+      if (!ok) return;
       notifyFamily("已把今日报告发送给家属（演示）。");
       showToast("已模拟发送到家属微信");
     });
@@ -635,6 +642,53 @@
   function showOfflineNotice(show) {
     const notice = $("#offlineNotice");
     if (notice) notice.classList.toggle("hidden", !show);
+  }
+
+  function confirmAction(options = {}) {
+    return new Promise((resolve) => {
+      const title = options.title || "确认操作";
+      const message = options.message || "";
+      const confirmText = options.confirmText || "确认";
+      const cancelText = options.cancelText || "取消";
+      const overlay = document.createElement("div");
+      overlay.className = "confirm-overlay";
+      const card = document.createElement("div");
+      card.className = "confirm-card";
+      const h = document.createElement("h3");
+      h.textContent = title;
+      const p = document.createElement("p");
+      p.textContent = message;
+      const actions = document.createElement("div");
+      actions.className = "confirm-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = cancelText;
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = options.danger ? "danger" : "primary";
+      ok.textContent = confirmText;
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      card.appendChild(h);
+      card.appendChild(p);
+      card.appendChild(actions);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      const close = (value) => {
+        overlay.remove();
+        document.removeEventListener("keydown", onKey);
+        resolve(value);
+      };
+      const onKey = (event) => {
+        if (event.key === "Escape") close(false);
+        if (event.key === "Enter") close(true);
+      };
+      cancel.addEventListener("click", () => close(false));
+      ok.addEventListener("click", () => close(true));
+      overlay.addEventListener("click", (event) => { if (event.target === overlay) close(false); });
+      document.addEventListener("keydown", onKey);
+      ok.focus();
+    });
   }
 
   async function askLLM(text) {
@@ -1414,7 +1468,14 @@
     root.innerHTML = html;
 
     const revoke = $("#familyRevoke");
-    if (revoke) revoke.addEventListener("click", () => {
+    if (revoke) revoke.addEventListener("click", async () => {
+      const ok = await confirmAction({
+        title: "撤回家属授权？",
+        message: "撤回后家属立即看不到今日报告、告警和复诊提醒，直到重新授权。",
+        confirmText: "撤回授权",
+        danger: true
+      });
+      if (!ok) return;
       r.access.authorized = false;
       r.access.code = null;
       r.access.codeExpires = 0;
@@ -1424,7 +1485,16 @@
       addTrace({ tool: "consent.revoke", title: "撤回授权", detail: "家属端立即锁定；不再发送报告/告警" });
     });
     const send = $("#familySend");
-    if (send) send.addEventListener("click", () => { notifyFamily("已发送今日照护报告。"); showToast("已模拟发送到家属微信"); });
+    if (send) send.addEventListener("click", async () => {
+      const ok = await confirmAction({
+        title: "发送今日报告给家属？",
+        message: "将发送：今日摘要、血压、用药完成情况、复诊提醒。不会发送原始对话。",
+        confirmText: "发送报告"
+      });
+      if (!ok) return;
+      notifyFamily("已发送今日照护报告。");
+      showToast("已模拟发送到家属微信");
+    });
     const print = $("#familyPrint");
     if (print) print.addEventListener("click", () => openPrintWindow("今日照护回执", receiptHTML(r), "receipt"));
     const doctor = $("#familyDoctor");
