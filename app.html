@@ -110,23 +110,18 @@
 <script>
 (function(){
   var API = String((window.CONFIG && CONFIG.apiBase) || "").replace(/\/+$/, "");
+  var qp = new URLSearchParams(location.search); if(qp.get("api")) API = qp.get("api").replace(/\/+$/, "");
   var ACCOUNTS = {
     elder: {name:"陈婆婆", label:"老人端", account:"13800000001", password:"123456"},
     family: {name:"陈先生", label:"家人端", account:"13800000002", password:"123456"},
     doctor: {name:"李医生", label:"医生端", account:"13800000003", password:"123456"}
   };
   var role = sessionStorage.getItem("ck_role") || "";
+  var token = sessionStorage.getItem("ck_token") || "";
+  var userName = sessionStorage.getItem("ck_name") || "";
   var tab = "";
-  var selectedPatient = "chen";
-  var patients = {
-    chen: {name:"陈婆婆", age:76, area:"广州荔湾", dx:"高血压、2型糖尿病", bp:"148/86", med:"2/3", follow:"11-25 09:00 · 社区医院二楼", alerts:[
-      {t:"今日 08:42", text:"血压 148/86，已建议静坐复测", level:"medium", handled:false},
-      {t:"昨日 16:10", text:"漏服一次降压药，已转药师确认", level:"medium", handled:true}
-    ]},
-    li: {name:"李伯", age:81, area:"广州越秀", dx:"高血压、慢阻肺", bp:"132/78", med:"3/3", follow:"11-28 10:00 · 社区医院", alerts:[
-      {t:"今日 09:10", text:"血氧 93%，已建议复测并联系家医", level:"high", handled:false}
-    ]}
-  };
+  var selectedPatient = "";
+  var patients = {};
   var navs = {
     elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"]],
     family: [["overview","今日报告"],["alerts","红线告警"],["meds","用药/复诊"],["doctor","医生摘要"],["consent","授权"]],
@@ -149,18 +144,43 @@
       box.appendChild(b);
     });
   }
-  function login(){
-    var a=ACCOUNTS[role||"elder"];
-    if(!role){$("#error").textContent="请先选择角色";return}
-    if($("#account").value.trim()!==a.account || $("#password").value!==a.password){$("#error").textContent="演示账号或密码不对";return}
-    sessionStorage.setItem("ck_role",role);tab=navs[role][0][0];renderShell();
+  async function loadPatients(){
+    var r=await fetch(API+"/api/app/patients",{headers:{Authorization:"Bearer "+token}});
+    if(!r.ok) throw new Error("patients "+r.status);
+    var d=await r.json();patients={};d.patients.forEach(function(p){patients[p.id]=p});
+    var keys=Object.keys(patients);selectedPatient=keys[0]||"";
   }
-  function logout(){sessionStorage.removeItem("ck_role");role="";renderLogin()}
+  async function login(){
+    if(!role){$("#error").textContent="请先选择角色";return}
+    $("#error").textContent="登录中…";
+    try{
+      var r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({account:$("#account").value.trim(),password:$("#password").value})});
+      var d=await r.json();
+      if(!r.ok) throw new Error(d.error||"登录失败");
+      token=d.token;role=d.role;userName=d.name;
+      sessionStorage.setItem("ck_token",token);sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
+      await loadPatients();tab=navs[role][0][0];$("#error").textContent="";renderShell();
+    }catch(e){$("#error").textContent="登录失败："+e.message}
+  }
+  function logout(){
+    if(token) fetch(API+"/api/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+token}}).catch(function(){});
+    token="";role="";userName="";patients={};selectedPatient="";
+    sessionStorage.removeItem("ck_token");sessionStorage.removeItem("ck_role");sessionStorage.removeItem("ck_name");renderLogin();
+  }
+  async function boot(){
+    if(!token){renderLogin();return}
+    try{
+      var r=await fetch(API+"/api/auth/me",{headers:{Authorization:"Bearer "+token}});
+      if(!r.ok) throw new Error("session");
+      var d=await r.json();role=d.role;userName=d.name;sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
+      await loadPatients();tab=navs[role][0][0];renderShell();
+    }catch(e){token="";role="";sessionStorage.removeItem("ck_token");renderLogin()}
+  }
 
   function renderShell(){
     $("#login").classList.add("hidden");$("#shell").classList.remove("hidden");
-    $("#rolePill").textContent=roleName(role);$("#whoName").textContent=ACCOUNTS[role].name;
-    $("#topSub").textContent=roleName(role)+" · 陈婆婆（演示）";
+    $("#rolePill").textContent=roleName(role);$("#whoName").textContent=userName||ACCOUNTS[role].name;
+    $("#topSub").textContent=roleName(role)+" · "+(userName||"演示");
     var nav=$("#nav");nav.innerHTML="";
     navs[role].forEach(function(x){var b=document.createElement("button");b.textContent=x[1];b.className=x[0]===tab?"on":"";b.onclick=function(){tab=x[0];renderShell()};nav.appendChild(b)});
     if(role==="elder") renderElder(); else if(role==="family") renderFamily(); else renderDoctor();
@@ -170,8 +190,8 @@
     return '<div class="alert '+(a.level==="high"?"":"good")+'"><strong>'+(a.handled?"已处理":"待处理")+'</strong> · '+esc(a.t)+'<br>'+esc(a.text)+'</div>';
   }
   function renderElder(){
-    var p=patients.chen;
-    var html='<div class="hero"><h2>陈婆婆，早晨</h2><p>今日：量血压 · 早上药 · 下周三复诊</p><div class="row"><span class="mini">血压 '+p.bp+'</span><span class="mini">用药 '+p.med+'</span><span class="mini">下周三复诊</span></div></div>';
+    var p=patients[Object.keys(patients)[0]];
+    var html='<div class="hero"><h2>'+esc(p.name)+'，早晨</h2><p>今日：量血压 · 早上药 · 下周三复诊</p><div class="row"><span class="mini">血压 '+p.bp+'</span><span class="mini">用药 '+p.med+'</span><span class="mini">下周三复诊</span></div></div>';
     if(tab==="home"){
       html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div><p class="muted">只做健康教育/提醒，不诊断、不开药。</p></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button><p class="muted" style="margin-top:8px">唔识字都可以用；答唔到会帮你叫家人/医生。</p></div></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
@@ -196,7 +216,7 @@
       var input=$("#chatInput");var text=input.value.trim();if(!text)return;input.value="";
       state.messages.push({role:"user",text:text});draw();
       try{
-        var r=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json","X-Request-ID":"APP-"+Date.now()},body:JSON.stringify({message:text,profile:{name:"陈婆婆"},history:state.messages.slice(-6)})});
+        var r=await fetch(API+"/api/app/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"X-Request-ID":"APP-"+Date.now()},body:JSON.stringify({patient_id:Object.keys(patients)[0],message:text,history:state.messages.slice(-6)})});
         var d=await r.json();state.messages.push({role:"agent",text:d.reply||"我而家未系好听得明。"});
       }catch(e){state.messages.push({role:"agent",text:"网络未通；可以叫家人/医生。"})}
       draw();
@@ -206,7 +226,7 @@
   }
 
   function renderFamily(){
-    var p=patients.chen;
+    var p=patients[Object.keys(patients)[0]];
     var html='<div class="hero"><h2>陈婆婆 · 家人端</h2><p>已授权 · 只读摘要 · 陈先生</p><div class="row"><span class="mini">授权：有效</span><span class="mini">数据：今日</span><span class="mini">来源：KB v0.2</span></div></div>';
     if(tab==="overview"){
       html+='<div class="grid"><div class="card"><h3>今日摘要</h3><p>血压 '+p.bp+'；用药 '+p.med+'；下周三复诊。</p><p class="muted">不是诊断，不替代医生。</p></div><div class="card"><h3>红线</h3>'+(p.alerts.length?p.alerts.map(alertHTML).join(""):'<p>今日未出现红线。</p>')+'</div></div>';
@@ -227,8 +247,9 @@
   }
 
   function renderDoctor(){
-    var p=patients[selectedPatient];
-    var html='<div class="hero"><h2>医生端 · '+ACCOUNTS.doctor.name+'</h2><p>只读 · 不可开药 · 不可写回 HIS/EMR</p><div class="row"><span class="mini">我的老人：2</span><span class="mini">高危：1</span><span class="mini">只看摘要</span></div></div>';
+    var p=patients[selectedPatient]||patients[Object.keys(patients)[0]];
+    var high=Object.keys(patients).filter(function(k){return patients[k].alerts.some(function(a){return a.level==="high"&&!a.handled})}).length;
+    var html='<div class="hero"><h2>医生端 · '+esc(userName)+'</h2><p>只读 · 不可开药 · 不可写回 HIS/EMR</p><div class="row"><span class="mini">我的老人：'+Object.keys(patients).length+'</span><span class="mini">高危：'+high+'</span><span class="mini">只看摘要</span></div></div>';
     html+='<div class="doctor-row" style="margin-top:10px"><div class="card"><h3>我的老人</h3>'+Object.keys(patients).map(function(k){var x=patients[k];return '<div class="patient '+(k===selectedPatient?"on":"")+'" data-p="'+k+'"><strong>'+esc(x.name)+'</strong><br><span class="muted">'+x.age+'岁 · '+esc(x.area)+'</span></div>'}).join("")+'<p class="muted">演示数据；真实需 HIS/家医分配。</p></div><div class="card"><h3>'+esc(p.name)+' · 只读摘要</h3><p>诊断：'+esc(p.dx)+'</p><p>今日血压：'+esc(p.bp)+'；用药：'+esc(p.med)+'。</p><p>复诊：'+esc(p.follow)+'</p><h3 style="margin-top:10px">红线/告警</h3>'+(p.alerts.map(alertHTML).join("")||"<p>今日未出现红线。</p>")+'<div class="readonly">医生端只读；不可开处方/改病历/写回 HIS。告警为站内提醒。</div></div></div>';
     $("#content").innerHTML=html;
     document.querySelectorAll("[data-p]").forEach(function(b){b.onclick=function(){selectedPatient=b.dataset.p;renderShell()}});
@@ -239,7 +260,7 @@
   $("#password").addEventListener("keydown",function(e){if(e.key==="Enter")login()});
   $("#logout").onclick=logout;
   $("#modalClose").onclick=function(){$("#modal").classList.add("hidden")};
-  if(role && ACCOUNTS[role]){tab=navs[role][0][0];renderShell()}else renderLogin();
+  boot();
 })();
 </script>
 </body>
