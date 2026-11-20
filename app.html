@@ -73,6 +73,7 @@
   .modal{position:fixed;inset:0;background:rgba(15,40,45,.45);display:grid;place-items:center;padding:18px;z-index:20}.modal .box{background:#fffdf8;border-radius:16px;padding:16px;max-width:520px;width:100%;max-height:80vh;overflow:auto;white-space:pre-wrap;font-size:12px}
   .modal .box h3{margin:0 0 8px}.modal .box button{margin-top:10px}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#17363d;color:#fff;padding:9px 13px;border-radius:9px;font-size:11px;z-index:30;opacity:0;transition:.2s}.toast.show{opacity:1}
+  .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
   .muted{color:var(--muted);font-size:10px}
   @media(max-width:760px){.roles{grid-template-columns:1fr}.form{grid-template-columns:1fr}.main{grid-template-columns:1fr;padding:9px}.side{order:2}.nav{flex-direction:row;overflow:auto}.doctor-row{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.login-card{padding:18px}.hero h2{font-size:18px}}
 </style>
@@ -95,6 +96,7 @@
   </div>
 </div>
 
+<div id="offlineBar" class="offline-bar hidden">而家断网：仍可看今日信息；急症请直接叫家人/120。</div>
 <div id="shell" class="shell hidden">
   <div class="top">
     <div class="brand"><div class="logo">乡</div><div><h1>乡音健康管家</h1><p id="topSub">三端 App</p></div></div>
@@ -127,11 +129,35 @@
   var selectedPatient = "";
   var patients = {};
   var navs = {
-    elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"]],
+    elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"],["settings","语音设置"]],
     family: [["overview","今日报告"],["alerts","红线告警"],["meds","用药/复诊"],["doctor","医生摘要"],["consent","授权"]],
     doctor: [["patients","我的老人"],["summary","只读摘要"],["alerts","告警"]]
   };
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
+  var prefs = {};
+  try { prefs = JSON.parse(localStorage.getItem("ck_speech_prefs") || "{}") || {}; } catch(e) { prefs = {}; }
+  var speechRate = Number(prefs.rate || 0.82);
+  var speechVolume = Number(prefs.volume || 1);
+  var speechVoiceURI = prefs.voice || "";
+  function savePrefs(){ try { localStorage.setItem("ck_speech_prefs", JSON.stringify({rate:speechRate, volume:speechVolume, voice:speechVoiceURI})); } catch(e){} }
+  function availableVoices(){
+    if(!("speechSynthesis" in window)) return [];
+    return speechSynthesis.getVoices().filter(function(v){ return /^zh/i.test(v.lang) || /yue|粤|Cantonese/i.test(v.name); });
+  }
+  function speakText(text){
+    if(!("speechSynthesis" in window)){ toast("呢部机未支持播报"); return; }
+    var u = new SpeechSynthesisUtterance(String(text||""));
+    u.lang = "zh-HK"; u.rate = speechRate; u.volume = speechVolume;
+    var vs = availableVoices();
+    if(speechVoiceURI){ var pick = vs.filter(function(v){return v.voiceURI===speechVoiceURI})[0]; if(pick) u.voice = pick; }
+    else { var hk = vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0]; if(hk) u.voice = hk; }
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }
+  function offlineReply(text){
+    var urgent = /(胸痛|心口痛|唞唔到气|呼吸困难|晕|昏|中风|半边|讲话唔清|大出血|血止唔住|跌倒|撞到头)/.test(text);
+    if(urgent) return {role:"agent", text:"婆婆，呢句可能系急症，唔好等网络。即刻坐低/唔好行，叫家人，必要时打 120。", local:true};
+    return {role:"agent", text:"而家断网，我已经记住你讲嘅。你可以先按「叫家人/叫医生」；网络返嚟我再答。", local:true};
+  }
 
   function $(s){return document.querySelector(s)}
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
@@ -201,6 +227,13 @@
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
     } else if(tab==="chat"){
       html+='<div class="card"><h3>同我讲</h3><p class="muted">可以打字；语音按钮先做 UI 占位，真机接 ASR。</p><div class="chat" id="chat"></div><div class="chat-input"><input id="chatInput" placeholder="例如：我今日血压高"><button class="primary" id="chatSend">发送</button></div><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button><button id="speakLast">播报最后一条</button></div></div>';
+    } else if(tab==="settings"){
+      html+='<div class="card"><h3>语音设置</h3><p class="muted">调大细声、快慢、拣粤语音色；会记住。</p>'+
+        '<div class="setting-row"><label>语速</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="'+speechRate+'"><span class="setting-val" id="rateVal">'+speechRate.toFixed(2)+'</span></div>'+
+        '<div class="setting-row"><label>音量</label><input id="vol" type="range" min="0.3" max="1" step="0.05" value="'+speechVolume+'"><span class="setting-val" id="volVal">'+Math.round(speechVolume*100)+'%</span></div>'+
+        '<div class="setting-row"><label>音色</label><select id="voice"><option value="">自动（粤语优先）</option></select></div>'+
+        '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div></div>'+
+        '<div class="card" style="margin-top:10px"><h3>离线</h3><p>App 壳可离线打开；对话会提示断网，急症仍显示 120 提示。</p><p class="muted">不是完整离线 ASR/TTS；语音识别仍需网络。</p></div>';
     } else if(tab==="meds"){
       html+='<div class="card"><h3>用药（只读）</h3><div class="list"><div class="item"><span>氨氯地平 5mg · 早上</span><span class="pill">按医嘱</span></div><div class="item"><span>二甲双胍 0.5g · 早晚</span><span class="pill">按医嘱</span></div></div><p class="muted">不调剂量、不换药；有疑问问医生/药师。</p></div>';
     } else {
@@ -209,6 +242,7 @@
     $("#content").innerHTML=html;
     if(tab==="home"){var b=$("#toChat");if(b)b.onclick=function(){tab="chat";renderShell()}}
     if(tab==="chat"){bindChat();}
+    if(tab==="settings"){bindSettings();}
     document.querySelectorAll("[data-call]").forEach(function(b){b.onclick=function(){toast("已模拟通知"+ (b.dataset.call==="family"?"家人":"医生"))}});
   }
 
@@ -222,11 +256,24 @@
       try{
         var r=await fetch(API+"/api/app/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"X-Request-ID":"APP-"+Date.now()},body:JSON.stringify({patient_id:Object.keys(patients)[0],message:text,history:state.messages.slice(-6)})});
         var d=await r.json();state.messages.push({role:"agent",text:d.reply||"我而家未系好听得明。"});
-      }catch(e){state.messages.push({role:"agent",text:"网络未通；可以叫家人/医生。"})}
+      }catch(e){
+        if(!navigator.onLine){ try{var q=JSON.parse(localStorage.getItem("ck_offline_queue")||"[]");q.push({text:text,at:Date.now()});localStorage.setItem("ck_offline_queue",JSON.stringify(q.slice(-20)))}catch(err){} }
+        state.messages.push(offlineReply(text));
+      }
       draw();
     }
     $("#chatSend").onclick=send;$("#chatInput").addEventListener("keydown",function(e){if(e.key==="Enter")send()});
-    $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last&&"speechSynthesis" in window){var u=new SpeechSynthesisUtterance(last.text);u.lang="zh-HK";u.rate=.82;speechSynthesis.cancel();speechSynthesis.speak(u)}else toast("无播报")};
+    $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last)speakText(last.text);else toast("无播报")};
+  }
+
+  function bindSettings(){
+    var vs=availableVoices();var sel=$("#voice");
+    vs.forEach(function(v){var o=document.createElement("option");o.value=v.voiceURI;o.textContent=v.name+" ("+v.lang+")";if(v.voiceURI===speechVoiceURI)o.selected=true;sel.appendChild(o)});
+    $("#rate").oninput=function(){speechRate=Number(this.value);$("#rateVal").textContent=speechRate.toFixed(2);savePrefs()};
+    $("#vol").oninput=function(){speechVolume=Number(this.value);$("#volVal").textContent=Math.round(speechVolume*100)+"%";savePrefs()};
+    $("#voice").onchange=function(){speechVoiceURI=this.value;savePrefs()};
+    $("#testVoice").onclick=function(){speakText("婆婆，我系乡音健康管家。而家语速同音量系咪舒服？")};
+    $("#resetVoice").onclick=function(){speechRate=0.82;speechVolume=1;speechVoiceURI="";savePrefs();renderShell();toast("已恢复默认")};
   }
 
   function renderFamily(){
@@ -264,6 +311,11 @@
   $("#password").addEventListener("keydown",function(e){if(e.key==="Enter")login()});
   $("#logout").onclick=logout;
   $("#modalClose").onclick=function(){$("#modal").classList.add("hidden")};
+  function updateOffline(){var b=$("#offlineBar");if(b)b.classList.toggle("hidden",navigator.onLine)}
+  window.addEventListener("online",function(){updateOffline();toast("网络返嚟啦")});
+  window.addEventListener("offline",function(){updateOffline();toast("已断网，仍可看今日信息")});
+  updateOffline();
+  if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=function(){if(tab==="settings")bindSettings()};}
   boot();
 })();
 </script>
