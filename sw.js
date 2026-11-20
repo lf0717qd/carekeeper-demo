@@ -1,4 +1,4 @@
-const CACHE = "carekeeper-app-v2";
+const CACHE = "carekeeper-app-v3";
 const ASSETS = ["./app.html", "./config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
