@@ -74,6 +74,7 @@
   .modal .box h3{margin:0 0 8px}.modal .box button{margin-top:10px}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#17363d;color:#fff;padding:9px 13px;border-radius:9px;font-size:11px;z-index:30;opacity:0;transition:.2s}.toast.show{opacity:1}
   .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
+  .speech-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f4c5c;color:#fff;border-radius:12px;padding:8px 11px;font-size:11px;display:flex;gap:8px;align-items:center;z-index:25;box-shadow:0 8px 24px rgba(15,76,92,.25)}.speech-bar.hidden{display:none}.speech-bar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:3px 7px;font-size:10px;cursor:pointer}
   .muted{color:var(--muted);font-size:10px}
   @media(max-width:760px){.roles{grid-template-columns:1fr}.form{grid-template-columns:1fr}.main{grid-template-columns:1fr;padding:9px}.side{order:2}.nav{flex-direction:row;overflow:auto}.doctor-row{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.login-card{padding:18px}.hero h2{font-size:18px}}
 </style>
@@ -97,6 +98,7 @@
 </div>
 
 <div id="offlineBar" class="offline-bar hidden">而家断网：仍可看今日信息；急症请直接叫家人/120。</div>
+<div id="speechBar" class="speech-bar hidden"><span id="speechStatus">播报中</span><button id="speechPause">暂停</button><button id="speechStop">停止</button></div>
 <div id="shell" class="shell hidden">
   <div class="top">
     <div class="brand"><div class="logo">乡</div><div><h1>乡音健康管家</h1><p id="topSub">三端 App</p></div></div>
@@ -144,14 +146,50 @@
     if(!("speechSynthesis" in window)) return [];
     return speechSynthesis.getVoices().filter(function(v){ return /^zh/i.test(v.lang) || /yue|粤|Cantonese/i.test(v.name); });
   }
+  var speechState = {chunks:[], index:0, playing:false, paused:false};
+  function splitSpeech(text){
+    var clean = String(text||"").replace(/\s+/g," ").trim();
+    if(!clean) return [];
+    var parts = clean.split(/(?<=[。！？；!?;\n])/).map(function(x){return x.trim()}).filter(Boolean);
+    var out=[];
+    parts.forEach(function(p){
+      if(p.length<=90){out.push(p);return}
+      for(var i=0;i<p.length;i+=90) out.push(p.slice(i,i+90));
+    });
+    return out;
+  }
+  function updateSpeechBar(){
+    var bar=$("#speechBar");if(!bar)return;
+    var on=speechState.playing||speechState.paused;
+    bar.classList.toggle("hidden",!on);
+    if(on)$("#speechStatus").textContent=(speechState.paused?"已暂停":"播报")+" "+(speechState.index+1)+"/"+speechState.chunks.length;
+    var b=$("#speechPause");if(b)b.textContent=speechState.paused?"继续":"暂停";
+  }
+  function speakNext(){
+    if(speechState.index>=speechState.chunks.length){speechState.playing=false;speechState.paused=false;speechState.index=0;updateSpeechBar();return}
+    var u=new SpeechSynthesisUtterance(speechState.chunks[speechState.index]);
+    u.lang="zh-HK";u.rate=speechRate;u.volume=speechVolume;
+    var vs=availableVoices();
+    if(speechVoiceURI){var pick=vs.filter(function(v){return v.voiceURI===speechVoiceURI})[0];if(pick)u.voice=pick}
+    else{var hk=vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0];if(hk)u.voice=hk}
+    u.onend=function(){if(!speechState.playing)return;speechState.index++;updateSpeechBar();speakNext()};
+    u.onerror=function(){speechState.playing=false;updateSpeechBar()};
+    speechSynthesis.speak(u);
+  }
   function speakText(text){
     if(!("speechSynthesis" in window)){ toast("呢部机未支持播报"); return; }
-    var u = new SpeechSynthesisUtterance(String(text||""));
-    u.lang = "zh-HK"; u.rate = speechRate; u.volume = speechVolume;
-    var vs = availableVoices();
-    if(speechVoiceURI){ var pick = vs.filter(function(v){return v.voiceURI===speechVoiceURI})[0]; if(pick) u.voice = pick; }
-    else { var hk = vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0]; if(hk) u.voice = hk; }
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    var chunks=splitSpeech(text);if(!chunks.length)return;
+    speechSynthesis.cancel();
+    speechState={chunks:chunks,index:0,playing:true,paused:false};
+    updateSpeechBar();speakNext();
+  }
+  function stopSpeech(){if("speechSynthesis" in window)speechSynthesis.cancel();speechState.playing=false;speechState.paused=false;speechState.index=0;updateSpeechBar()}
+  function togglePause(){
+    if(!("speechSynthesis" in window))return;
+    if(!speechState.playing&&!speechState.paused)return;
+    if(speechState.paused){speechSynthesis.resume();speechState.paused=false}
+    else{speechSynthesis.pause();speechState.paused=true}
+    updateSpeechBar();
   }
   function offlineReply(text){
     var urgent = /(胸痛|心口痛|唞唔到气|呼吸困难|晕|昏|中风|半边|讲话唔清|大出血|血止唔住|跌倒|撞到头)/.test(text);
@@ -272,7 +310,7 @@
     $("#rate").oninput=function(){speechRate=Number(this.value);$("#rateVal").textContent=speechRate.toFixed(2);savePrefs()};
     $("#vol").oninput=function(){speechVolume=Number(this.value);$("#volVal").textContent=Math.round(speechVolume*100)+"%";savePrefs()};
     $("#voice").onchange=function(){speechVoiceURI=this.value;savePrefs()};
-    $("#testVoice").onclick=function(){speakText("婆婆，我系乡音健康管家。而家语速同音量系咪舒服？")};
+    $("#testVoice").onclick=function(){speakText("婆婆，我系乡音健康管家。而家语速同音量系咪舒服？如果太长，我会一句一句讲。你可以随时按暂停，或者按停止。")};
     $("#resetVoice").onclick=function(){speechRate=0.82;speechVolume=1;speechVoiceURI="";savePrefs();renderShell();toast("已恢复默认")};
   }
 
@@ -311,6 +349,7 @@
   $("#password").addEventListener("keydown",function(e){if(e.key==="Enter")login()});
   $("#logout").onclick=logout;
   $("#modalClose").onclick=function(){$("#modal").classList.add("hidden")};
+  $("#speechPause").onclick=togglePause;$("#speechStop").onclick=stopSpeech;
   function updateOffline(){var b=$("#offlineBar");if(b)b.classList.toggle("hidden",navigator.onLine)}
   window.addEventListener("online",function(){updateOffline();toast("网络返嚟啦")});
   window.addEventListener("offline",function(){updateOffline();toast("已断网，仍可看今日信息")});
