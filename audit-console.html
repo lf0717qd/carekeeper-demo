@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审计查询台 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--orange:#e07a3f;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8;--bad:#b23a2b;--good:#2f7d5b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.55}
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 16px 50px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:20px 24px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  header h1{margin:0 0 4px;font-size:23px}header p{margin:0;font-size:12px;opacity:.85}
+  .badge{background:#fff4e8;color:#7a5438;border:1px solid #efd8c3;border-radius:999px;padding:4px 9px;font-size:10px;white-space:nowrap}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+  .stat{background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:10px 12px}
+  .stat strong{display:block;font-family:var(--mono);font-size:22px;color:var(--teal)}.stat span{font-size:10px;color:var(--muted)}
+  .stat.bad strong{color:var(--bad)}
+  .drop{border:2px dashed #b9d3cd;border-radius:14px;padding:18px;text-align:center;background:#f8fcfb;cursor:pointer}
+  .drop.drag{background:#eef8f2;border-color:var(--teal)}
+  .drop strong{display:block;font-size:14px}.drop span{font-size:11px;color:var(--muted)}
+  textarea{width:100%;height:70px;margin-top:8px;font:inherit;font-size:11px;border:1px solid #cfdedb;border-radius:8px;padding:8px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  input,select{font:inherit;font-size:12px;padding:7px 9px;border:1px solid #cfdedb;border-radius:9px;background:#fff;color:var(--ink)}
+  input[type=search]{min-width:220px}
+  button{font:inherit;font-size:12px;border:0;border-radius:9px;padding:8px 12px;background:var(--teal);color:#fff;cursor:pointer}
+  button.ghost{background:#fff;color:var(--teal);border:1px solid #cfdedb}
+  .table-wrap{max-height:55vh;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{padding:7px 8px;border-bottom:1px solid #e8f0ee;text-align:left;vertical-align:top}
+  th{position:sticky;top:0;background:#f4f9f7;color:#3c5a5e;z-index:2;font-weight:600}
+  tr:hover td{background:#f8fcfb;cursor:pointer}
+  .pill{display:inline-block;padding:1px 6px;border-radius:999px;font-size:9px;border:1px solid #dce8e5;background:#f4f9f7;color:#52676a;white-space:nowrap}
+  .pill.high{background:#fff3f1;border-color:#f2c8c3;color:#7a1b13}
+  .pill.front{background:#eef3ff;border-color:#c9d8f0;color:#2f4f7a}
+  .muted{color:var(--muted);font-size:10px}
+  .detail{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;white-space:pre-wrap;font-size:11px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+  @media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}header{padding:16px}.wrap{padding:12px 10px 40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>审计查询台</h1><p>导入 SLS 导出文件 → 本地筛选/统计/导出；不上传</p></div>
+    <span class="badge">本地只读 · 不是实时 SLS</span>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <strong>拖入 SLS 导出的 JSON / JSONL / CSV</strong>
+      <span>或点击选择文件。支持 [audit] 前缀的 JSON 行；文件只在本页解析。</span>
+      <input id="file" type="file" accept=".json,.jsonl,.csv,.txt" hidden>
+    </div>
+    <textarea id="paste" placeholder="也可以直接粘贴 SLS 查询结果 JSON/CSV"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button id="loadPaste">载入粘贴内容</button>
+      <button class="ghost" id="export">导出当前筛选 CSV</button>
+      <button class="ghost" id="sample">载入示例（演示）</button>
+      <span class="muted" id="count">0 条</span>
+    </div>
+    <div class="filters">
+      <input id="q" type="search" placeholder="搜 request_id / event / client_event / action">
+      <select id="event"><option value="">全部 event</option></select>
+      <select id="risk"><option value="">全部 risk</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select>
+      <select id="kind"><option value="">全部来源</option><option value="frontend.audit">frontend.audit</option><option value="chat.response">chat.response</option><option value="kb.search">kb.search</option><option value="api.error">api.error</option></select>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>时间</th><th>event</th><th>request_id</th><th>risk</th><th>source</th><th>client_event</th><th>action</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div id="detail" class="detail" hidden></div>
+  </div>
+  <footer>乡音健康管家 · 本地审计查询台 · 只解析导出文件，不连接 SLS</footer>
+</div>
+<script>
+(function(){
+  const $=(s)=>document.querySelector(s);
+  let data=[], filtered=[];
+  const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  function extract(line){
+    const m=String(line).match(/\[audit\]\s*(\{.*\})\s*$/);
+    if(m){try{return JSON.parse(m[1]);}catch(e){}}
+    try{const o=JSON.parse(line); if(typeof o==="object") return o;}catch(e){}
+    return null;
+  }
+  function parseCSV(text){
+    const rows=[]; let row=[], field="", q=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(q){ if(c==='"'&&n==='"'){field+='"';i++;} else if(c==='"'){q=false;} else field+=c; }
+      else if(c==='"'){q=true;} else if(c===","){row.push(field);field="";}
+      else if(c==="\n"){row.push(field);field="";rows.push(row);row=[];}
+      else if(c!=="\r"){field+=c;}
+    }
+    if(field.length||row.length){row.push(field);rows.push(row);}
+    if(!rows.length)return [];
+    const head=rows[0].map(h=>h.trim().replace(/^\uFEFF/,""));
+    if(!head.includes("event"))return [];
+    return rows.slice(1).filter(r=>r.some(Boolean)).map(r=>{const o={};head.forEach((h,i)=>o[h]=r[i]||"");return o;});
+  }
+  function parseText(text){
+    text=String(text||"").trim(); if(!text) return [];
+    if(text.split(/\r?\n/)[0].includes(",")){const c=parseCSV(text);if(c.length)return c;}
+    try{const a=JSON.parse(text); if(Array.isArray(a)) return a;}catch(e){}
+    const rows=[];
+    for(const line of text.split(/\r?\n/)){
+      const o=extract(line); if(o) rows.push(o.message?extract(o.message)||o:o);
+    }
+    return rows;
+  }
+  function normalize(o){
+    const m=o.message?extract(o.message):null;
+    const x=m||o;
+    return {ts:x.ts||o.__time__||"", event:x.event||"", request_id:x.request_id||"", risk:x.risk||"", source:x.source||"", client_event:x.client_event||"", action:x.action||"", intent:x.intent||"", detail_hash:x.detail_hash||"", raw:o};
+  }
+  const SAMPLE=[
+    {ts:"2026-11-20T03:16:27+0000",event:"frontend.audit",request_id:"8df7e8d557fa",client_event:"consent.revoke",action:"revoked",detail_hash:"7f023bc9e580"},
+    {ts:"2026-11-20T03:12:08+0000",event:"frontend.audit",request_id:"6b1c2d3e4f50",client_event:"privacy.delete",action:"deleted",detail_hash:"a1b2c3d4e5f6"},
+    {ts:"2026-11-20T03:10:44+0000",event:"chat.response",request_id:"AUDIT-TEST-005",risk:"low",source:"llm",intent:"其他",message_len:6},
+    {ts:"2026-11-20T03:09:31+0000",event:"chat.response",request_id:"AUDIT-TEST-006",risk:"high",source:"rule",intent:"胸痛",needs_human:true},
+    {ts:"2026-11-20T03:08:12+0000",event:"api.error",request_id:"ERR-001",error:"Timeout"}
+  ];
+  function setData(arr){
+    data=arr.map(normalize).filter(x=>x.event||x.request_id||x.client_event);
+    const ev=[...new Set(data.map(x=>x.event).filter(Boolean))].sort();
+    $("#event").innerHTML='<option value="">全部 event</option>'+ev.map(e=>'<option>'+esc(e)+'</option>').join("");
+    apply();
+  }
+  function apply(){
+    const q=$("#q").value.trim().toLowerCase(), ev=$("#event").value, risk=$("#risk").value, kind=$("#kind").value;
+    filtered=data.filter(x=>{
+      if(ev&&x.event!==ev)return false; if(risk&&x.risk!==risk)return false; if(kind&&x.event!==kind)return false;
+      if(q&&!((x.request_id+" "+x.event+" "+x.client_event+" "+x.action+" "+x.source+" "+x.intent).toLowerCase().includes(q)))return false;
+      return true;
+    });
+    $("#count").textContent=filtered.length+" / "+data.length+" 条";
+    const s={total:data.length,front:data.filter(x=>x.event==="frontend.audit").length,chat:data.filter(x=>x.event==="chat.response").length,high:data.filter(x=>x.risk==="high").length,err:data.filter(x=>x.event==="api.error").length};
+    $("#stats").innerHTML=[["总条数",s.total],["chat.response",s.chat],["frontend.audit",s.front],["risk=high",s.high],["api.error",s.err]].map(([k,v])=>'<div class="stat '+(k==="risk=high"||k==="api.error"?"bad":"")+'"><strong>'+v+'</strong><span>'+k+'</span></div>').join("");
+    $("#rows").innerHTML=filtered.length?filtered.map((x,i)=>'<tr data-i="'+i+'"><td>'+esc(x.ts)+'</td><td>'+esc(x.event)+'</td><td>'+esc(x.request_id)+'</td><td>'+(x.risk==='high'?'<span class="pill high">high</span>':esc(x.risk))+'</td><td>'+esc(x.source)+'</td><td>'+(x.event==='frontend.audit'?'<span class="pill front">'+esc(x.client_event)+'</span>':esc(x.client_event))+'</td><td>'+esc(x.action)+'</td></tr>').join(""):'<tr><td colspan="7" style="padding:30px;text-align:center;color:#6b7b7d">没有匹配数据</td></tr>';
+    $("#detail").hidden=true;
+  }
+  function show(i){const x=filtered[i];if(!x)return; $("#detail").hidden=false;$("#detail").textContent=JSON.stringify(x.raw,null,2);}
+  $("#rows").addEventListener("click",e=>{const tr=e.target.closest("tr[data-i]");if(tr)show(Number(tr.dataset.i));});
+  $("#q").addEventListener("input",apply);["event","risk","kind"].forEach(id=>$("#"+id).addEventListener("change",apply));
+  $("#drop").addEventListener("click",()=>$("#file").click());
+  $("#file").addEventListener("change",()=>{const f=$("#file").files[0];if(!f)return;const r=new FileReader();r.onload=()=>setData(parseText(r.result));r.readAsText(f,"utf-8");});
+  ["dragenter","dragover"].forEach(e=>$("#drop").addEventListener(e,ev=>{ev.preventDefault();$("#drop").classList.add("drag")}));
+  ["dragleave","drop"].forEach(e=>$("#drop").addEventListener(e,ev=>{ev.preventDefault();$("#drop").classList.remove("drag")}));
+  $("#drop").addEventListener("drop",ev=>{const f=ev.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=()=>setData(parseText(r.result));r.readAsText(f,"utf-8");});
+  $("#loadPaste").addEventListener("click",()=>setData(parseText($("#paste").value)));
+  $("#sample").addEventListener("click",()=>setData(SAMPLE));
+  $("#export").addEventListener("click",()=>{
+    const cols=["ts","event","request_id","risk","source","client_event","action","intent","detail_hash"];
+    const lines=[cols.join(",")].concat(filtered.map(x=>cols.map(c=>'"'+String(x[c]||"").replace(/"/g,'""')+'"').join(",")));
+    const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="audit_filtered.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  });
+})();
+</script>
+</body>
+</html>
