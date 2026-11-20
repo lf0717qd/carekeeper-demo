@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>格式化 / 脱敏测试 · 乡音健康管家</title>
+<style>
+  :root{--ink:#17363d;--teal:#0f4c5c;--muted:#6b7b7d;--line:#dce8e5;--paper:#fffdf8}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef4f2;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.6}
+  .wrap{max-width:900px;margin:0 auto;padding:20px 16px 50px}
+  header{background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:20px;padding:20px 24px}
+  header h1{margin:0 0 4px;font-size:22px}header p{margin:0;font-size:12px;opacity:.85}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px}
+  textarea{width:100%;height:110px;font:inherit;font-size:13px;border:1px solid #cfdedb;border-radius:10px;padding:10px;resize:vertical}
+  button{font:inherit;font-size:12px;border:0;border-radius:9px;padding:8px 12px;background:var(--teal);color:#fff;cursor:pointer}
+  button.ghost{background:#fff;color:var(--teal);border:1px solid #cfdedb}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .out{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;white-space:pre-wrap;font-size:13px;min-height:60px}
+  .label{font-size:10px;color:var(--muted);margin-bottom:4px}
+  .row{margin-top:10px}
+  footer{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>格式化 / 脱敏测试</h1><p>证件/手机/银行卡脱敏；血压/血糖/日期/单位播报；不保存输入</p></header>
+  <div class="card">
+    <div class="label">输入一段话</div>
+    <textarea id="input">婆婆身份证440106195001011234，电话13800138000，血压180/100mmHg，血糖5.6mmol/L，药费1234.5元，2026-11-25复诊，打120。</textarea>
+    <div class="actions">
+      <button id="run">格式化 / 脱敏</button>
+      <button class="ghost" id="sample">恢复示例</button>
+      <button class="ghost" id="clear">清空</button>
+    </div>
+    <div class="row"><div class="label">脱敏后</div><div class="out" id="masked">—</div></div>
+    <div class="row"><div class="label">播报文本</div><div class="out" id="speech">—</div></div>
+    <div class="row"><div class="label">状态</div><div class="out" id="status">未运行</div></div>
+  </div>
+  <footer>乡音健康管家 · 演示工具 · 输入不写库</footer>
+</div>
+<script src="config.js?v=20"></script>
+<script>
+(function(){
+  const $=(s)=>document.querySelector(s); const API=String((window.CONFIG&&CONFIG.apiBase)||"").replace(//$/,"");
+  async function run(){
+    const text=$("#input").value;
+    $("#status").textContent="请求中…";
+    try{
+      const r=await fetch(API+"/api/format",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
+      $("#masked").textContent=d.masked||"—";
+      $("#speech").textContent=d.speech||"—";
+      $("#status").textContent="完成 · 原始 "+d.raw_len+" 字 · 未保存";
+    }catch(e){$("#status").textContent="失败："+e.message;}
+  }
+  $("#run").addEventListener("click",run);
+  $("#sample").addEventListener("click",()=>{$("#input").value="婆婆身份证440106195001011234，电话13800138000，血压180/100mmHg，血糖5.6mmol/L，药费1234.5元，2026-11-25复诊，打120。";});
+  $("#clear").addEventListener("click",()=>{$("#input").value="";$("#masked").textContent="—";$("#speech").textContent="—";$("#status").textContent="未运行";});
+})();
+</script>
+</body>
+</html>
