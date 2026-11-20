@@ -80,10 +80,22 @@
   const $=(s)=>document.querySelector(s);
   let data=[], filtered=[];
   const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  function firstJSON(text){
+    const start=String(text).indexOf("{"); if(start<0)return null;
+    let depth=0,inStr=false,esc=false;
+    for(let i=start;i<text.length;i++){
+      const c=text[i];
+      if(inStr){ if(esc)esc=false; else if(c==="\\")esc=true; else if(c==='"')inStr=false; continue; }
+      if(c==='"'){inStr=true;continue;}
+      if(c==="{")depth++;
+      if(c==="}"){depth--; if(depth===0){try{return JSON.parse(text.slice(start,i+1));}catch(e){return null;}}}
+    }
+    return null;
+  }
   function extract(line){
-    const m=String(line).match(/\[audit\]\s*(\{.*\})\s*$/);
-    if(m){try{return JSON.parse(m[1]);}catch(e){}}
-    try{const o=JSON.parse(line); if(typeof o==="object") return o;}catch(e){}
+    const s=String(line||""); const idx=s.indexOf("[audit]");
+    if(idx>=0){const o=firstJSON(s.slice(idx+7)); if(o)return o;}
+    try{const o=JSON.parse(s); if(o&&typeof o==="object"){if(typeof o.message==="string")return extract(o.message)||o; return o;}}catch(e){}
     return null;
   }
   function parseCSV(text){
@@ -125,6 +137,7 @@
   ];
   function setData(arr){
     data=arr.map(normalize).filter(x=>x.event||x.request_id||x.client_event);
+    $("#q").value="";$("#risk").value="";$("#kind").value="";
     const ev=[...new Set(data.map(x=>x.event).filter(Boolean))].sort();
     $("#event").innerHTML='<option value="">全部 event</option>'+ev.map(e=>'<option>'+esc(e)+'</option>').join("");
     apply();
