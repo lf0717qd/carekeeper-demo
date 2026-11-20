@@ -271,6 +271,7 @@
         '<div class="setting-row"><label>音量</label><input id="vol" type="range" min="0.3" max="1" step="0.05" value="'+speechVolume+'"><span class="setting-val" id="volVal">'+Math.round(speechVolume*100)+'%</span></div>'+
         '<div class="setting-row"><label>音色</label><select id="voice"><option value="">自动（粤语优先）</option></select></div>'+
         '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div></div>'+
+        '<div class="card" style="margin-top:10px"><h3>粤拼校验</h3><p class="muted">ToJyutping · 只看粤语读音，不改写答案。</p><div class="chat-input"><input id="jpText" value="婆婆換片痛"><button class="primary" id="jpBtn">显示粤拼</button></div><div class="out" id="jpOut" style="margin-top:7px">—</div></div>'+
         '<div class="card" style="margin-top:10px"><h3>离线</h3><p>App 壳可离线打开；对话会提示断网，急症仍显示 120 提示。</p><p class="muted">不是完整离线 ASR/TTS；语音识别仍需网络。</p></div>';
     } else if(tab==="meds"){
       html+='<div class="card"><h3>用药（只读）</h3><div class="list"><div class="item"><span>氨氯地平 5mg · 早上</span><span class="pill">按医嘱</span></div><div class="item"><span>二甲双胍 0.5g · 早晚</span><span class="pill">按医嘱</span></div></div><p class="muted">不调剂量、不换药；有疑问问医生/药师。</p></div>';
@@ -312,6 +313,12 @@
     $("#voice").onchange=function(){speechVoiceURI=this.value;savePrefs()};
     $("#testVoice").onclick=function(){speakText("婆婆，我系乡音健康管家。而家语速同音量系咪舒服？如果太长，我会一句一句讲。你可以随时按暂停，或者按停止。")};
     $("#resetVoice").onclick=function(){speechRate=0.82;speechVolume=1;speechVoiceURI="";savePrefs();renderShell();toast("已恢复默认")};
+    $("#jpBtn").onclick=async function(){
+      var t=$("#jpText").value.trim();if(!t)return;
+      $("#jpOut").textContent="转换中…";
+      try{var r=await fetch(API+"/api/pronounce",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:t})});var d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));$("#jpOut").textContent=d.jyutping||"—";}
+      catch(e){$("#jpOut").textContent="粤拼服务未通："+e.message;}
+    };
   }
 
   function renderFamily(){
