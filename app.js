@@ -149,6 +149,7 @@
       });
       if (!ok) return;
       notifyFamily("已把今日报告发送给家属（演示）。");
+      reportAudit("report.send", "sent", "今日报告");
       showToast("已模拟发送到家属微信");
     });
   }
@@ -1303,6 +1304,15 @@
     r.access.audit = r.access.audit.slice(-20);
   }
 
+  function reportAudit(event, action, detail = "") {
+    fetch(apiUrl("/api/audit/event"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: event, action: action, detail: detail }),
+      keepalive: true
+    }).catch(() => {});
+  }
+
   function authCard(r) {
     const scopes = (r.access.scopes || []).map((x) => "<span class='auth-scope'>" + escapeHTML(x) + "</span>").join("");
     const audit = (r.access.audit || []).slice(-3).reverse().map((a) =>
@@ -1433,6 +1443,7 @@
         r.access.code = null;
         r.access.codeExpires = 0;
         auditAuth(r, "授权成功", name + " 输入授权码");
+        reportAudit("consent.authorize", "granted", "授权码验证");
         renderFamilyReport();
         showToast("授权成功");
       });
@@ -1484,6 +1495,7 @@
       r.access.code = null;
       r.access.codeExpires = 0;
       auditAuth(r, "撤回授权", "家属端立即锁定");
+      reportAudit("consent.revoke", "revoked", "家属端锁定");
       renderFamilyReport();
       showToast("已撤回授权，家属端已锁定");
       addTrace({ tool: "consent.revoke", title: "撤回授权", detail: "家属端立即锁定；不再发送报告/告警" });
@@ -1508,6 +1520,7 @@
       });
       if (!ok) return;
       notifyFamily("已发送今日照护报告。");
+      reportAudit("report.send", "sent", "今日报告");
       showToast("已模拟发送到家属微信");
     });
     const print = $("#familyPrint");
@@ -1553,6 +1566,7 @@
       }
     };
     renderFamilyReport();
+    reportAudit("privacy.delete", "deleted", receipt);
     showToast("已删除；凭证 " + receipt);
     addTrace({ tool: "privacy.delete", title: "删除今日数据", detail: "报告/告警/用药已清空；授权已撤回；凭证 " + receipt });
   }
