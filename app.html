@@ -109,7 +109,8 @@
 <script src="config.js?v=22"></script>
 <script>
 (function(){
-  var API = String((window.CONFIG && CONFIG.apiBase) || "").replace(/\/+$/, "");
+  var CFG = window.CAREKEEPER_CONFIG || window.CONFIG || {};
+  var API = String(CFG.apiBase || "").replace(/\/+$/, "");
   var qp = new URLSearchParams(location.search); if(qp.get("api")) API = qp.get("api").replace(/\/+$/, "");
   var ACCOUNTS = {
     elder: {name:"陈婆婆", label:"老人端", account:"13800000001", password:"123456"},
