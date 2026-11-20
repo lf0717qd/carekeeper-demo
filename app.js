@@ -4,6 +4,19 @@
   const CONFIG = window.CAREKEEPER_CONFIG || {};
   const API_BASE = String(CONFIG.apiBase || "").replace(/\/$/, "");
   const apiUrl = (path) => API_BASE + path;
+  let authToken = sessionStorage.getItem("ck_demo_token") || "";
+  async function ensureAuth() {
+    if (authToken) return authToken;
+    try {
+      const r = await fetch(apiUrl("/api/auth/login"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ account: "13800000001", password: "123456" }) });
+      if (!r.ok) throw new Error("auth " + r.status);
+      const d = await r.json();
+      authToken = d.token || "";
+      if (authToken) sessionStorage.setItem("ck_demo_token", authToken);
+    } catch (e) { authToken = ""; }
+    return authToken;
+  }
+  const authHeaders = () => authToken ? { "Authorization": "Bearer " + authToken } : {};
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -764,9 +777,10 @@
     let full = "";
     let doneData = null;
     try {
+      await ensureAuth();
       const response = await fetch(apiUrl("/api/chat_stream"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           message: text,
           profile: profile,
@@ -838,9 +852,10 @@
     addTrace({ tool: "llm.request", title: "调用 LLM", detail: "非流式兜底 · 问题：" + text.slice(0, 80), tone: "warm" });
     let data;
     try {
+      await ensureAuth();
       const response = await fetch(apiUrl("/api/chat"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           message: text,
           profile: profile,
