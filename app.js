@@ -1384,7 +1384,10 @@
       '<p class="muted">仅用于试点沟通；不可开药、不可改写病历、不替代医生判断。</p>' +
       '<h2>基本信息</h2><p>' + escapeHTML(profile.name) + '，' + profile.age + ' 岁，' + escapeHTML(profile.area) + '；诊断：' + escapeHTML(profile.conditions.join("、")) + '。</p>' +
       '<h2>今日情况</h2><p>' + escapeHTML(r.summary) + ' 血压：' + escapeHTML(r.bp) + '；用药：' + escapeHTML(r.med) + '。</p>' +
-      '<h2>红线/告警</h2><p>' + (r.alertText ? escapeHTML(r.alertText) : "今日未出现红线。") + '</p>' +
+      '<h2>红线/告警（' + (r.alertsList ? r.alertsList.length : 0) + '）</h2>' +
+      (r.alertsList && r.alertsList.length
+        ? '<ul>' + r.alertsList.map((a) => '<li>' + (a.handled ? '已处理' : '待处理') + ' · ' + escapeHTML(a.time) + ' · ' + escapeHTML(a.text) + '</li>').join('') + '</ul>'
+        : '<p>今日未出现红线。</p>') +
       '<h2>复诊</h2><p>' + escapeHTML(r.followup.date) + ' · ' + escapeHTML(r.followup.dept) + '；带：' + escapeHTML(r.followup.items) + '。</p>' +
       '<h2>在服药物（只读）</h2>' + medsHTML() +
       '<h2>来源</h2><p>KB v0.2；回答带 citations；规则层优先。</p>' +
