@@ -60,6 +60,8 @@
       <select id="doc"><option value="">全部文档</option></select>
       <select id="risk"><option value="">全部风险</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select>
       <select id="ai"><option value="">全部 AI 核对</option><option value="exact">exact</option><option value="near">near</option><option value="fail">fail</option></select>
+      <select id="status"><option value="">全部状态</option><option value="draft">draft</option><option value="approved">approved</option></select>
+      <button id="export" type="button">导出筛选 CSV</button>
       <label class="check"><input id="onlyReview" type="checkbox"> 只看待审30条</label>
       <span class="muted" id="count"></span>
     </div>
@@ -93,11 +95,12 @@
   }
   function apply(){
     const q=$("#q").value.trim().toLowerCase();
-    const doc=$("#doc").value, risk=$("#risk").value, ai=$("#ai").value, only=$("#onlyReview").checked;
+    const doc=$("#doc").value, risk=$("#risk").value, ai=$("#ai").value, status=$("#status").value, only=$("#onlyReview").checked;
     filtered=data.chunks.filter(c=>{
       if(doc && c.doc_id!==doc) return false;
       if(risk && c.risk!==risk) return false;
       if(ai && c.ai!==ai) return false;
+      if(status && c.status!==status) return false;
       if(only && !c.review) return false;
       if(q && !(c.chunk_id+" "+c.title+" "+c.section+" "+c.text).toLowerCase().includes(q)) return false;
       return true;
@@ -121,8 +124,14 @@
       '<p>'+esc(c.text)+'</p>'+
       '<div class="meta">只读展示，不代表内容已审核通过；以 Excel 护理/药师签字为准。</div>';
   }
-  $("#q").addEventListener("input",apply);["doc","risk","ai"].forEach(id=>$("#"+id).addEventListener("change",apply));$("#onlyReview").addEventListener("change",apply);
+  $("#q").addEventListener("input",apply);["doc","risk","ai","status"].forEach(id=>$("#"+id).addEventListener("change",apply));$("#onlyReview").addEventListener("change",apply);
   $("#rows").addEventListener("click",e=>{const tr=e.target.closest("tr[data-i]");if(tr)show(Number(tr.dataset.i));});
+  $("#export").addEventListener("click",()=>{
+    const cols=["chunk_id","doc_id","title","section","page","risk","ai","status","review","text"];
+    const lines=[cols.join(",")].concat(filtered.map(c=>cols.map(k=>'"'+String(c[k]===undefined?"":c[k]).replace(/"/g,'""')+'"').join(",")));
+    const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="kb_filtered.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  });
   fetch("kb-admin.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{
     data=d;renderStats();renderDocs();apply();
   }).catch(e=>{
