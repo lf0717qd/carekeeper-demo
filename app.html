@@ -140,6 +140,7 @@
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
   var agentState = {};
   var featureFlags = {};
+  var elderLarge = localStorage.getItem("ck_elder_large") === "1";
   var prefs = {};
   try { prefs = JSON.parse(localStorage.getItem("ck_speech_prefs") || "{}") || {}; } catch(e) { prefs = {}; }
   var speechRate = Number(prefs.rate || 0.82);
@@ -259,7 +260,7 @@
   }
 
   function alertHTML(a){
-    return '<div class="alert '+(a.level==="high"?"":"good")+'"><strong>'+(a.handled?"已处理":"待处理")+'</strong> · '+esc(a.t)+'<br>'+esc(a.text)+'</div>';
+    return '<div class="alert '+(a.level==="high"?"":"good")+'"><strong>'+(a.handled?"已处理":"待处理")+'</strong> · '+esc(a.t)+'<br>'+esc(a.text)+(a.why?'<div class="alert-why">危害：'+esc(a.why)+'</div>':'')+'</div>';
   }
   function renderElder(){
     var p=patients[Object.keys(patients)[0]];
@@ -268,13 +269,14 @@
       html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div><p class="muted">只做健康教育/提醒，不诊断、不开药。</p></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button><p class="muted" style="margin-top:8px">唔识字都可以用；答唔到会帮你叫家人/医生。</p></div></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
     } else if(tab==="chat"){
-      html+='<div class="card"><h3>同我讲</h3><p class="muted">可以打字；语音按钮先做 UI 占位，真机接 ASR。</p><div class="chat" id="chat"></div><div class="chat-input"><input id="chatInput" placeholder="例如：我今日血压高"><button class="primary" id="chatSend">发送</button></div><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button><button id="speakLast">播报最后一条</button></div></div>';
+      html+='<div class="card"><h3>同我讲</h3><p class="muted">按「讲嘢」录 6 秒，识别后填入；也可以打字。</p><div class="chat" id="chat"></div><div class="chat-input"><input id="chatInput" placeholder="例如：我今日血压高"><button class="primary" id="chatSend">发送</button><button class="ghost" id="micBtn">🎤 讲嘢</button></div><p class="muted" id="micStatus">按「讲嘢」录 6 秒，识别后填入。</p><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button><button id="speakLast">播报最后一条</button></div></div>';
     } else if(tab==="settings"){
       html+='<div class="card"><h3>语音设置</h3><p class="muted">调大细声、快慢、拣粤语音色；会记住。</p>'+
         '<div class="setting-row"><label>语速</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="'+speechRate+'"><span class="setting-val" id="rateVal">'+speechRate.toFixed(2)+'</span></div>'+
         '<div class="setting-row"><label>音量</label><input id="vol" type="range" min="0.3" max="1" step="0.05" value="'+speechVolume+'"><span class="setting-val" id="volVal">'+Math.round(speechVolume*100)+'%</span></div>'+
         '<div class="setting-row"><label>音色</label><select id="voice"><option value="">自动（粤语优先）</option></select></div>'+
-        '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div>'+((userSite&&userSite.dialect!=="粤语")?'<p class="muted">本站点：'+esc(userSite.dialect)+'，原生音色未接；先用系统中文/粤语音色。</p>':'')+'</div>'+
+        '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div>'+((userSite&&userSite.dialect!=="粤语")?'<p class="muted">本站点：'+esc(userSite.dialect)+'，原生音色未接；先用系统中文/粤语音色。</p>':'')+
+        '<div class="setting-row"><label>长辈模式</label><button class="ghost" id="elderToggle">长辈模式：'+(elderLarge?"开":"关")+'</button><span class="muted">放大字/按钮</span></div></div>'+
         '<div class="card" style="margin-top:10px"><h3>粤拼校验</h3><p class="muted">ToJyutping · 只看粤语读音，不改写答案。</p><div class="chat-input"><input id="jpText" value="婆婆換片痛"><button class="primary" id="jpBtn">显示粤拼</button></div><div class="out" id="jpOut" style="margin-top:7px">—</div></div>'+
         '<div class="card" style="margin-top:10px"><h3>离线</h3><p>App 壳可离线打开；对话会提示断网，急症仍显示 120 提示。</p><p class="muted">不是完整离线 ASR/TTS；语音识别仍需网络。</p></div>';
     } else if(tab==="meds"){
@@ -310,6 +312,31 @@
     }
     $("#chatSend").onclick=send;$("#chatInput").addEventListener("keydown",function(e){if(e.key==="Enter")send()});
     $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last)speakText(last.text);else toast("无播报")};
+    var recorder=null,chunks=[],timer=null;
+    function setMic(s){$("#micStatus").textContent=s}
+    async function startMic(){
+      if(!navigator.mediaDevices||!window.MediaRecorder){setMic("呢部机唔支持录音；请打字");return}
+      try{
+        var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        chunks=[];recorder=new MediaRecorder(stream);
+        recorder.ondataavailable=function(e){if(e.data.size)chunks.push(e.data)};
+        recorder.onstop=async function(){
+          stream.getTracks().forEach(function(t){t.stop()});
+          var blob=new Blob(chunks,{type:chunks[0]&&chunks[0].type||"audio/webm"});
+          var reader=new FileReader();
+          reader.onloadend=async function(){
+            var b64=String(reader.result||"").split(",")[1]||"";
+            setMic("识别中…");
+            try{var r=await fetch(API+"/api/asr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64})});var d=await r.json();if(!r.ok||!d.text)throw new Error(d.error||"ASR失败");$("#chatInput").value=d.text;setMic("识别到："+d.text);}
+            catch(e){setMic("识别失败："+e.message+"；可以打字")}
+          };
+          reader.readAsDataURL(blob);
+        };
+        recorder.start();setMic("录音中…再按一下停止");
+        timer=setTimeout(function(){if(recorder&&recorder.state==="recording")recorder.stop()},6000);
+      }catch(e){setMic("麦克风未授权："+e.message)}
+    }
+    $("#micBtn").onclick=function(){if(recorder&&recorder.state==="recording"){clearTimeout(timer);recorder.stop()}else{startMic()}};
   }
 
   function bindSettings(){
@@ -320,6 +347,7 @@
     $("#voice").onchange=function(){speechVoiceURI=this.value;savePrefs()};
     $("#testVoice").onclick=function(){speakText("婆婆，我系乡音健康管家。而家语速同音量系咪舒服？如果太长，我会一句一句讲。你可以随时按暂停，或者按停止。")};
     $("#resetVoice").onclick=function(){speechRate=0.82;speechVolume=1;speechVoiceURI="";savePrefs();renderShell();toast("已恢复默认")};
+    $("#elderToggle").onclick=function(){elderLarge=!elderLarge;localStorage.setItem("ck_elder_large",elderLarge?"1":"0");applyElderLarge();$("#elderToggle").textContent="长辈模式："+(elderLarge?"开":"关");toast(elderLarge?"已开长辈模式":"已关长辈模式")};
     $("#jpBtn").onclick=async function(){
       var t=$("#jpText").value.trim();if(!t)return;
       $("#jpOut").textContent="转换中…";
@@ -375,11 +403,13 @@
   async function loadFlags(){
     try{var r=await fetch(API+"/api/features");if(!r.ok)return;var d=await r.json();featureFlags=d.features||{};updateMaintenance();}catch(e){}
   }
+  function applyElderLarge(){document.body.classList.toggle("elder-large",elderLarge);var b=$("#elderToggle");if(b)b.textContent="长辈模式："+(elderLarge?"开":"关")}
   function updateOffline(){var b=$("#offlineBar");if(b)b.classList.toggle("hidden",navigator.onLine)}
   window.addEventListener("online",function(){updateOffline();toast("网络返嚟啦")});
   window.addEventListener("offline",function(){updateOffline();toast("已断网，仍可看今日信息")});
   updateOffline();
   if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=function(){if(tab==="settings")bindSettings()};}
+  applyElderLarge();
   boot();
   loadFlags();setInterval(loadFlags,30000);
 })();
