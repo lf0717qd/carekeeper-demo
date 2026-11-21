@@ -17,6 +17,22 @@
     return authToken;
   }
   const authHeaders = () => authToken ? { "Authorization": "Bearer " + authToken } : {};
+  async function authorizedFetch(path, options = {}, retry = true) {
+    await ensureAuth();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(apiUrl(path), { ...options, headers: { ...(options.headers || {}), ...authHeaders() }, signal: controller.signal });
+      if (response.status === 401 && retry) {
+        authToken = "";
+        sessionStorage.removeItem("ck_demo_token");
+        return authorizedFetch(path, options, false);
+      }
+      return response;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -910,7 +926,7 @@
     try {
       const t = await ensureAuth();
       if (!t) return { ok: false };
-      const r = await fetch(apiUrl("/api/handoff"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ patient_id: "chen", reason }) });
+      const r = await authorizedFetch("/api/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ patient_id: "chen", reason }) });
       const d = await r.json();
       return { ok: r.ok, id: d.handoff_id, status: d.status };
     } catch (e) { return { ok: false }; }
@@ -1810,7 +1826,7 @@
     } catch (e) { /* ignore */ }
   }
 
-  function showCareAlert(tag, title, body, actionHref, actionText) {
+  function showCareAlert(tag, title, body, actionHref, actionText, level) {
     let box = document.getElementById("careAlert");
     if (!box) {
       box = document.createElement("div");
@@ -1820,6 +1836,7 @@
       document.body.appendChild(box);
       box.querySelector("button").onclick = () => box.classList.remove("show");
     }
+    box.className = "care-alert show level-" + (level || "yellow");
     box.querySelector(".tag").textContent = tag;
     box.querySelector("h3").textContent = title;
     box.querySelector("p").textContent = body;
@@ -1827,6 +1844,9 @@
     link.textContent = actionText || "去照护闭环";
     link.href = actionHref || "care-loop.html";
     box.classList.add("show");
+    if (navigator.vibrate) {
+      try { navigator.vibrate(level === "red" ? [240, 100, 240, 100, 240] : level === "yellow" ? [140] : [60]); } catch (e) { /* ignore */ }
+    }
     addTrace({ tool: "care.reminder", title: title, detail: body.slice(0, 90), tone: "warm" });
   }
 
@@ -1849,7 +1869,7 @@
     try {
       const t = await ensureAuth();
       if (!t) return;
-      const r = await fetch(apiUrl("/api/app/care?patient_id=chen"), { headers: { ...authHeaders() } });
+      const r = await authorizedFetch("/api/app/care?patient_id=chen");
       if (!r.ok) return;
       careData = await r.json();
       renderCareReminder();
@@ -1866,7 +1886,7 @@
       const key = "bp:" + latest.id;
       if (force || !careNotified(key)) {
         markCareNotified(key);
-        showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 " + latest.systolic + "/" + latest.diastolic + " mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压");
+        showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 " + latest.systolic + "/" + latest.diastolic + " mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压", "red");
         return;
       }
     }
@@ -1876,29 +1896,31 @@
       const key = "fu:" + fu.id;
       if (!isNaN(remind.getTime()) && now >= remind && (force || !careNotified(key))) {
         markCareNotified(key);
-        showCareAlert("复诊提醒", "复诊就快到", fu.appointment_at + " " + fu.hospital + " " + (fu.department || "") + "。记得带血压记录同药袋。", "care-loop.html", "看复诊安排");
+        showCareAlert("复诊提醒", "复诊就快到", fu.appointment_at + " " + fu.hospital + " " + (fu.department || "") + "。记得带血压记录同药袋。", "care-loop.html", "看复诊安排", "yellow");
         return;
       }
     }
     const hh = now.getHours();
     const mm = now.getMinutes();
+    const quiet = hh >= 22 || hh < 7;
+    if (quiet && !force) return;
     const near = (target) => hh === target && mm < 15;
     if (near(8) || near(18)) {
       const slot = hh < 12 ? "am" : "pm";
       const key = "med:" + now.toISOString().slice(0, 10) + ":" + slot;
       if (force || !careNotified(key)) {
         markCareNotified(key);
-        showCareAlert("用药提醒", "够钟食药啦", (careData.medications || []).map((m) => m.name + " " + m.dose + " · " + m.instruction).join("\n") + "\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡");
+        showCareAlert("用药提醒", "够钟食药啦", (careData.medications || []).map((m) => m.name + " " + m.dose + " · " + m.instruction).join("\n") + "\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡", "yellow");
       }
     }
   }
 
   function previewCareReminder() {
     const list = [
-      () => showCareAlert("用药提醒", "够钟食药啦", "氨氯地平 5mg · 早上饭后一粒\n二甲双胍 0.5g · 早晚饭后各一粒\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡"),
-      () => showCareAlert("复诊提醒", "复诊就快到", "11 月 25 日 09:00 · 社区医院二楼慢病门诊。记得带血压记录同药袋。", "care-loop.html", "看复诊安排"),
-      () => showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 148/86 mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压"),
-      () => showCareAlert("饮食提醒", "今日饮食：低盐低糖", "高血压 + 糖尿病：少盐、少糖、少油；多菜、适量蛋白；唔好用酱汁送饭。", "care-loop.html", "看照护闭环")
+      () => showCareAlert("用药提醒", "够钟食药啦", "氨氯地平 5mg · 早上饭后一粒\n二甲双胍 0.5g · 早晚饭后各一粒\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡", "yellow"),
+      () => showCareAlert("复诊提醒", "复诊就快到", "11 月 25 日 09:00 · 社区医院二楼慢病门诊。记得带血压记录同药袋。", "care-loop.html", "看复诊安排", "yellow"),
+      () => showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 148/86 mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压", "red"),
+      () => showCareAlert("饮食提醒", "今日饮食：低盐低糖", "高血压 + 糖尿病：少盐、少糖、少油；多菜、适量蛋白；唔好用酱汁送饭。", "care-loop.html", "看照护闭环", "green")
     ];
     list[carePreviewIndex % list.length]();
     carePreviewIndex += 1;
@@ -1934,9 +1956,30 @@
         }
       }
       await LN.schedule({ notifications });
+      if (LN.addListener) {
+        LN.addListener("localNotificationActionPerformed", (event) => {
+          const nid = event && event.notification && event.notification.id;
+          if (nid === 2001) location.href = "care-loop.html#followup";
+          else location.href = "care-loop.html#meds";
+        });
+      }
       nativeNotificationsReady = true;
       addTrace({ tool: "care.notification", title: "系统提醒已排程", detail: "每日 08:00/18:00 + 复诊提醒", tone: "warm" });
     } catch (e) { /* plugin may be unavailable */ }
+  }
+
+  const notificationGuideBtn = $("#notificationGuide");
+  if (notificationGuideBtn) {
+    notificationGuideBtn.addEventListener("click", async () => {
+      const cap = window.Capacitor;
+      const LN = cap && cap.Plugins && cap.Plugins.LocalNotifications;
+      if (!LN) { showToast("浏览器版只能用站内提醒"); return; }
+      try {
+        const p = await LN.requestPermissions();
+        if (p.display === "granted") { showToast("通知已开"); setupNativeNotifications(); }
+        else showToast("通知被拒；请在系统设置开启");
+      } catch (e) { showToast("通知开启失败"); }
+    });
   }
 
   window.__demo = {
