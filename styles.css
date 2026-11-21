@@ -1051,3 +1051,16 @@ body.large-mode .care-reminder-head .link-btn{font-size:11px}
 .care-alert-box .actions{display:flex;gap:7px;flex-wrap:wrap}
 .care-alert-box button,.care-alert-box a{border:0;border-radius:8px;padding:8px 11px;background:#0f4c5c;color:#fff;font-size:12px;cursor:pointer;text-decoration:none}
 .care-alert-box a{background:#fff;color:#0f4c5c;border:1px solid #cfdedb}
+
+/* high contrast mode */
+body.high-contrast{background:#fff!important;color:#000!important}
+body.high-contrast .page,body.high-contrast .phone-screen,body.high-contrast .workspace-card,body.high-contrast .card{background:#fff!important;color:#000!important}
+body.high-contrast .bubble{background:#fff!important;color:#000!important;border:2px solid #000!important}
+body.high-contrast .today-strip,body.high-contrast .care-reminder,body.high-contrast .alert-banner{border:2px solid #000!important;background:#fff!important;color:#000!important}
+body.high-contrast .chip,body.high-contrast .phone-actions button,body.high-contrast .composer input,body.high-contrast .composer button,body.high-contrast .link-btn{border:2px solid #000!important;background:#fff!important;color:#000!important}
+body.high-contrast .mic-button{background:#000!important;color:#fff!important;border:3px solid #000!important}
+body.high-contrast .mic-text,body.high-contrast .mic-hint,body.high-contrast .voice-label,body.high-contrast .switch-label{color:#000!important}
+body.high-contrast .tab.active{background:#000!important;color:#fff!important}
+body.high-contrast .topbar,body.high-contrast header{background:#000!important;color:#fff!important}
+body.high-contrast .demo-pill{background:#fff!important;color:#000!important;border:2px solid #000!important}
+body.high-contrast .care-alert-box{background:#fff!important;color:#000!important;border:3px solid #000!important}
