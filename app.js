@@ -1784,6 +1784,119 @@
     toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
   }
 
+  // ---------- care reminders ----------
+  let careData = null;
+  let carePreviewIndex = 0;
+
+  function careNotified(key) {
+    try { return JSON.parse(localStorage.getItem("ck_care_notified") || "{}")[key] === true; } catch (e) { return false; }
+  }
+  function markCareNotified(key) {
+    try {
+      const m = JSON.parse(localStorage.getItem("ck_care_notified") || "{}");
+      m[key] = true;
+      localStorage.setItem("ck_care_notified", JSON.stringify(m));
+    } catch (e) { /* ignore */ }
+  }
+
+  function showCareAlert(tag, title, body, actionHref, actionText) {
+    let box = document.getElementById("careAlert");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "careAlert";
+      box.className = "care-alert";
+      box.innerHTML = '<div class="care-alert-box"><span class="tag"></span><h3></h3><p></p><div class="actions"><button type="button">知道啦</button><a href="care-loop.html">去照护闭环</a></div></div>';
+      document.body.appendChild(box);
+      box.querySelector("button").onclick = () => box.classList.remove("show");
+    }
+    box.querySelector(".tag").textContent = tag;
+    box.querySelector("h3").textContent = title;
+    box.querySelector("p").textContent = body;
+    const link = box.querySelector("a");
+    link.textContent = actionText || "去照护闭环";
+    link.href = actionHref || "care-loop.html";
+    box.classList.add("show");
+    addTrace({ tool: "care.reminder", title: title, detail: body.slice(0, 90), tone: "warm" });
+  }
+
+  function renderCareReminder() {
+    const el = $("#careReminderText");
+    if (!el) return;
+    if (!careData) {
+      el.textContent = "饮食：低盐、低糖、少油；用药和复诊提醒会在这里出现。";
+      return;
+    }
+    const parts = ["饮食：低盐、低糖、少油，按餐吃，唔好漏餐。"];
+    const meds = careData.medications || [];
+    if (meds.length) parts.push("用药：" + meds.map((m) => m.name + " " + m.dose).join("、") + "。");
+    const fu = (careData.followups || [])[0];
+    if (fu) parts.push("复诊：" + fu.appointment_at + " " + fu.hospital + " " + (fu.department || "") + "。");
+    el.textContent = parts.join(" ");
+  }
+
+  async function loadCareReminders() {
+    try {
+      const t = await ensureAuth();
+      if (!t) return;
+      const r = await fetch(apiUrl("/api/app/care?patient_id=chen"), { headers: { ...authHeaders() } });
+      if (!r.ok) return;
+      careData = await r.json();
+      renderCareReminder();
+      checkCareReminders(false);
+    } catch (e) { /* backend may be older */ }
+  }
+
+  function checkCareReminders(force) {
+    if (!careData) return;
+    const now = new Date();
+    const latest = (careData.bp || [])[0];
+    if (latest && (latest.systolic >= 160 || latest.diastolic >= 100)) {
+      const key = "bp:" + latest.id;
+      if (force || !careNotified(key)) {
+        markCareNotified(key);
+        showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 " + latest.systolic + "/" + latest.diastolic + " mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压");
+        return;
+      }
+    }
+    const fu = (careData.followups || [])[0];
+    if (fu && fu.remind_at) {
+      const remind = new Date(String(fu.remind_at).replace(" ", "T"));
+      const key = "fu:" + fu.id;
+      if (!isNaN(remind.getTime()) && now >= remind && (force || !careNotified(key))) {
+        markCareNotified(key);
+        showCareAlert("复诊提醒", "复诊就快到", fu.appointment_at + " " + fu.hospital + " " + (fu.department || "") + "。记得带血压记录同药袋。", "care-loop.html", "看复诊安排");
+        return;
+      }
+    }
+    const hh = now.getHours();
+    const mm = now.getMinutes();
+    const near = (target) => hh === target && mm < 15;
+    if (near(8) || near(18)) {
+      const slot = hh < 12 ? "am" : "pm";
+      const key = "med:" + now.toISOString().slice(0, 10) + ":" + slot;
+      if (force || !careNotified(key)) {
+        markCareNotified(key);
+        showCareAlert("用药提醒", "够钟食药啦", (careData.medications || []).map((m) => m.name + " " + m.dose + " · " + m.instruction).join("\n") + "\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡");
+      }
+    }
+  }
+
+  function previewCareReminder() {
+    const list = [
+      () => showCareAlert("用药提醒", "够钟食药啦", "氨氯地平 5mg · 早上饭后一粒\n二甲双胍 0.5g · 早晚饭后各一粒\n食完记得打卡；唔好自己加药。", "care-loop.html", "去打卡"),
+      () => showCareAlert("复诊提醒", "复诊就快到", "11 月 25 日 09:00 · 社区医院二楼慢病门诊。记得带血压记录同药袋。", "care-loop.html", "看复诊安排"),
+      () => showCareAlert("血压提醒", "血压偏高，先坐低复测", "最近一次 148/86 mmHg。坐低休息 10 分钟再量；如果胸痛、气促、视物模糊，尽快就医。唔好自己加药。", "care-loop.html", "去记录血压"),
+      () => showCareAlert("饮食提醒", "今日饮食：低盐低糖", "高血压 + 糖尿病：少盐、少糖、少油；多菜、适量蛋白；唔好用酱汁送饭。", "care-loop.html", "看照护闭环")
+    ];
+    list[carePreviewIndex % list.length]();
+    carePreviewIndex += 1;
+  }
+
+  const reminderDemoBtn = $("#reminderDemo");
+  if (reminderDemoBtn) reminderDemoBtn.addEventListener("click", previewCareReminder);
+  setTimeout(loadCareReminders, 1200);
+  setInterval(() => checkCareReminders(false), 30000);
+
   window.__demo = {
     startScenario,
     state
