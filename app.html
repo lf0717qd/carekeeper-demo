@@ -76,6 +76,23 @@
   .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
   .speech-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f4c5c;color:#fff;border-radius:12px;padding:8px 11px;font-size:11px;display:flex;gap:8px;align-items:center;z-index:25;box-shadow:0 8px 24px rgba(15,76,92,.25)}.speech-bar.hidden{display:none}.speech-bar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:3px 7px;font-size:10px;cursor:pointer}
   .muted{color:var(--muted);font-size:10px}
+  .chat-card{padding:10px}
+  .care-mini{background:#fff8ef;border:1px solid #efd8c3;border-radius:11px;padding:8px 10px;font-size:10px;line-height:1.55;color:#6b4a35}
+  .care-mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;color:#7a4326;font-size:11px}
+  .care-mini-head .link-btn{font-size:9px}
+  .care-mini p{margin:0}
+  .big-mic{display:flex;flex-direction:column;align-items:center;justify-content:center;width:168px;height:168px;border-radius:50%;border:0;background:#0f4c5c;color:#fff9ef;margin:12px auto 8px;box-shadow:0 10px 30px rgba(15,76,92,.22),0 0 0 12px rgba(255,255,255,.55);cursor:pointer}
+  .big-mic-ico{width:34px;height:34px;line-height:1;margin-bottom:5px;color:#fff9ef}
+  .big-mic b{font-size:17px;line-height:1.25;font-weight:700}
+  .chat-card .chat{height:auto;min-height:56px;max-height:150px;margin-top:4px;overflow:auto}
+  .chat-card .chat .b{font-size:12px}
+  .quick-chips{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}
+  .quick-chips button{border:1px solid #cfdedb;background:#fff;color:#52676a;border-radius:99px;padding:7px 10px;font-size:11px;cursor:pointer}
+  .chat-card .chat-input input{font-size:12px;padding:9px}
+  .send-arrow{width:42px;min-width:42px;border-radius:50%;font-size:16px;padding:8px}
+  .chat-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:7px}
+  .chat-actions button{border:1px solid #cfdedb;background:#fff;color:#0f4c5c;border-radius:9px;padding:8px 4px;font-size:11px;cursor:pointer}
+  #micStatus:empty{display:none}
   .elder-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
   .elder-tabs button{border:1px solid #cfdedb;background:#fff;color:var(--teal);border-radius:10px;padding:8px 11px;font-size:12px;cursor:pointer}
   .elder-tabs button.on{background:var(--teal);color:#fff;border-color:var(--teal)}
@@ -298,7 +315,15 @@
       html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button></div></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
     } else if(tab==="chat"){
-      html+='<div class="card"><h3>同我讲</h3><p class="muted">按「讲嘢」录 6 秒，识别后填入；也可以打字。</p><div class="chat" id="chat"></div><div class="chat-input"><input id="chatInput" placeholder="例如：我今日血压高"><button class="primary" id="chatSend">发送</button><button class="ghost" id="micBtn">🎤 讲嘢</button></div><p class="muted" id="micStatus">按「讲嘢」录 6 秒，识别后填入。</p><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button><button id="speakLast">播报最后一条</button></div></div>';
+      html+='<div class="card chat-card">'+
+        '<div class="care-mini"><div class="care-mini-head"><strong>今日照护</strong><span><button class="link-btn" type="button" id="previewReminder">预览提醒</button><button class="link-btn" type="button" id="openNotify">开通知</button></span></div><p>饮食：低盐、低糖、少油，按餐吃。用药：氨氯地平 5mg、二甲双胍 0.5g。复诊：2026-11-25 09:00 社区医院二楼慢病门诊。</p></div>'+
+        '<button class="big-mic" id="micBtn" aria-label="按住讲嘢"><svg class="big-mic-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><line x1="12" y1="18" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg><b>按一下<br>讲嘢</b></button>'+
+        '<div class="chat" id="chat"></div>'+
+        '<div class="quick-chips"><button data-quick="我食咗药未">用药</button><button data-quick="我血压高">血压高</button><button data-quick="我心口闷">心口闷</button><button data-quick="几时复诊">复诊</button><button data-quick="帮我出家属报告">家属报告</button></div>'+
+        '<div class="chat-input"><input id="chatInput" placeholder="试一句：我今晚可唔可以食粥？"><button class="primary send-arrow" id="chatSend" aria-label="发送">➤</button></div>'+
+        '<p class="muted" id="micStatus"></p>'+
+        '<div class="chat-actions"><button id="speakLast">🔊 重听</button><button data-call="family">👨‍👩‍👧 家人</button><button data-call="doctor">🩺 医生</button></div>'+
+        '</div>';
     } else if(tab==="settings"){
       html+='<div class="card"><h3>语音设置</h3><p class="muted">调大细声、快慢、拣粤语音色；会记住。</p>'+
         '<div class="setting-row"><label>语速</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="'+speechRate+'"><span class="setting-val" id="rateVal">'+speechRate.toFixed(2)+'</span></div>'+
@@ -341,6 +366,9 @@
       draw();
     }
     $("#chatSend").onclick=send;$("#chatInput").addEventListener("keydown",function(e){if(e.key==="Enter")send()});
+    document.querySelectorAll("[data-quick]").forEach(function(b){b.onclick=function(){$("#chatInput").value=b.dataset.quick;send();}});
+    if($("#previewReminder"))$("#previewReminder").onclick=function(){toast("预览：够钟食药啦；复诊记得带血压记录")};
+    if($("#openNotify"))$("#openNotify").onclick=function(){toast("请在手机系统设置允许通知")};
     $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last)speakText(last.text);else toast("无播报")};
     var recorder=null,chunks=[],timer=null;
     function setMic(s){$("#micStatus").textContent=s}
