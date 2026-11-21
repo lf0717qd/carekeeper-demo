@@ -2,7 +2,7 @@
   "use strict";
 
   const CONFIG = window.CAREKEEPER_CONFIG || {};
-  const API_BASE = String(CONFIG.apiBase || "").replace(/\/$/, "");
+  const API_BASE = (() => { const q = new URLSearchParams(location.search).get("api"); return String(q || CONFIG.apiBase || "").replace(/\/$/, ""); })();
   const apiUrl = (path) => API_BASE + path;
   let authToken = sessionStorage.getItem("ck_demo_token") || "";
   async function ensureAuth() {
@@ -29,7 +29,7 @@
     history: [],
     realAsr: false,
     recognition: null,
-    cloudAsr: false,
+    cloudAsr: true,
     mediaRecorder: null,
     mediaStream: null,
     recording: false,
@@ -139,7 +139,14 @@
         sendFromInput();
       }
     });
-    $("#micBtn").addEventListener("click", handleMic);
+    const micButton = $("#micBtn");
+    let micHeld = false;
+    micButton.addEventListener("pointerdown", (e) => { e.preventDefault(); micHeld = true; handleMic(); });
+    micButton.addEventListener("pointerup", (e) => { e.preventDefault(); micHeld = false; if (state.recording) stopCloudRecording(); });
+    micButton.addEventListener("pointercancel", () => { micHeld = false; if (state.recording) stopCloudRecording(); });
+    micButton.addEventListener("pointerleave", () => { if (micHeld) { micHeld = false; if (state.recording) stopCloudRecording(); } });
+    micButton.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!state.recording) handleMic(); } });
+    micButton.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (state.recording) stopCloudRecording(); } });
     setupAsr();
     $$(".phone-actions button").forEach((button) => {
       button.addEventListener("click", () => handlePhoneAction(button.dataset.action));
@@ -899,7 +906,32 @@
   }
 
   // ---------- phone actions ----------
-  function handlePhoneAction(action) {
+  async function requestHandoff(reason) {
+    try {
+      const t = await ensureAuth();
+      if (!t) return { ok: false };
+      const r = await fetch(apiUrl("/api/handoff"), { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ patient_id: "chen", reason }) });
+      const d = await r.json();
+      return { ok: r.ok, id: d.handoff_id, status: d.status };
+    } catch (e) { return { ok: false }; }
+  }
+
+  function showCallConfirm(title, text) {
+    let box = document.getElementById("callConfirm");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "callConfirm";
+      box.className = "call-confirm";
+      box.innerHTML = '<div class="call-confirm-box"><h3></h3><p></p><button type="button">知道啦</button></div>';
+      document.body.appendChild(box);
+    }
+    box.querySelector("h3").textContent = title;
+    box.querySelector("p").textContent = text;
+    box.querySelector("button").onclick = () => box.classList.remove("show");
+    box.classList.add("show");
+  }
+
+  async function handlePhoneAction(action) {
     if (action === "repeat") {
       if (state.lastAgentText) {
         addMessage("agent", "我讲多一次：" + state.lastAgentText);
@@ -910,18 +942,32 @@
       return;
     }
     if (action === "family") {
+      const r = await requestHandoff("elder_family_button");
       notifyFamily("婆婆按了「家人」按钮，请回电。");
       addMessage("agent", "好，我帮你叫家人。你等阵，唔使急。");
-      showToast("已模拟呼叫家属");
+      showCallConfirm("已通知家人", r.ok ? "已放入家属/人工队列" + (r.id ? "（#" + r.id + "）" : "") + "。家属端会出现告警。" : "本机已记录，但后端未通；请直接打电话给家人。");
       return;
     }
     if (action === "doctor") {
+      const r = await requestHandoff("elder_doctor_button");
       addTrace({ tool: "human.takeover", title: "转人工/家医", detail: "老人主动按「医生」；带上下文转接", tone: "warm" });
       addMessage("agent", "好，我帮你接社区医院李医生。你唔使重复讲，我已经将情况交低。");
       notifyFamily("婆婆按了「医生」按钮，已转社区医院李医生（演示）。");
-      showToast("已模拟转接家医");
+      showCallConfirm("已通知医生", r.ok ? "已放入医生/人工队列" + (r.id ? "（#" + r.id + "）" : "") + "。" : "本机已记录，但后端未通；请直接联系医生。");
     }
   }
+
+  const largeModeBtn = $("#largeModeBtn");
+  function applyLargeMode() {
+    const on = localStorage.getItem("ck_large_mode") === "1";
+    document.body.classList.toggle("large-mode", on);
+    if (largeModeBtn) largeModeBtn.textContent = on ? "普通模式" : "长辈模式";
+  }
+  if (largeModeBtn) largeModeBtn.addEventListener("click", () => {
+    localStorage.setItem("ck_large_mode", document.body.classList.contains("large-mode") ? "0" : "1");
+    applyLargeMode();
+  });
+  applyLargeMode();
 
   // ---------- mic / input ----------
   function setupAsr() {
@@ -940,7 +986,7 @@
       }
       return;
     }
-    button.textContent = "录音识别";
+    button.textContent = state.cloudAsr ? "切回模拟" : "录音识别";
     button.addEventListener("click", () => {
       if (!state.apiOnline) {
         showToast("当前是静态演示版，录音识别需要后端；请用本地版或等公网后端");
@@ -957,11 +1003,7 @@
       stopCloudRecording();
       return;
     }
-    if (state.cloudAsr) {
-      startCloudAsr();
-    } else {
-      simulateMic();
-    }
+    startCloudAsr();
   }
 
   function pickAudioMime() {
@@ -1007,13 +1049,13 @@
       recorder.start();
       state.recording = true;
       $("#micBtn").classList.add("listening");
-      $("#micHint").textContent = "听紧… 讲 5 秒，讲完会自动停";
-      addTrace({ tool: "asr.cloud", title: "云端粤语识别", detail: "录音 5 秒 → GLM-ASR-2512", tone: "warm" });
+      $("#micHint").textContent = "听紧… 按住讲，松手结束（最多 60 秒）";
+      addTrace({ tool: "asr.cloud", title: "云端粤语识别", detail: "按住录音，松手结束（最多60秒）→ GLM-ASR-2512", tone: "warm" });
       state.recordTimer = setTimeout(() => {
         if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
           state.mediaRecorder.stop();
         }
-      }, 5000);
+      }, 60000);
     } catch (error) {
       state.recording = false;
       $("#micBtn").classList.remove("listening");
