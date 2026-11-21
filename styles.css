@@ -1035,3 +1035,19 @@ body.large-mode .link-btn{font-size:12px!important}
 .call-confirm-box h3{margin:0 0 6px;font-size:17px;color:#17363d}
 .call-confirm-box p{margin:0 0 12px;font-size:13px;color:#52676a;line-height:1.6}
 .call-confirm-box button{border:0;border-radius:9px;padding:9px 14px;background:#0f4c5c;color:#fff;font-size:13px;cursor:pointer}
+
+/* care reminders */
+.care-reminder{margin:8px 12px 0;background:#fff8ef;border:1px solid #efd8c3;border-radius:11px;padding:8px 10px;font-size:10.5px;color:#6b4a35;line-height:1.5}
+.care-reminder-head{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px;color:#7a4326}
+.care-reminder-head .link-btn{font-size:9px}
+body.large-mode .care-reminder{font-size:12.5px}
+body.large-mode .care-reminder-head .link-btn{font-size:11px}
+.care-alert{position:fixed;inset:0;background:rgba(15,40,45,.5);display:none;place-items:center;z-index:110;padding:18px}
+.care-alert.show{display:grid}
+.care-alert-box{background:#fffdf8;border-radius:16px;padding:18px;max-width:370px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+.care-alert-box .tag{display:inline-block;background:#fff3e8;color:#7a4326;border-radius:99px;padding:2px 8px;font-size:10px;margin-bottom:7px}
+.care-alert-box h3{margin:0 0 6px;font-size:17px;color:#17363d}
+.care-alert-box p{margin:0 0 12px;font-size:13px;line-height:1.65;color:#52676a}
+.care-alert-box .actions{display:flex;gap:7px;flex-wrap:wrap}
+.care-alert-box button,.care-alert-box a{border:0;border-radius:8px;padding:8px 11px;background:#0f4c5c;color:#fff;font-size:12px;cursor:pointer;text-decoration:none}
+.care-alert-box a{background:#fff;color:#0f4c5c;border:1px solid #cfdedb}
