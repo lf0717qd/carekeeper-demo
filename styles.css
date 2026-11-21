@@ -1064,3 +1064,13 @@ body.high-contrast .tab.active{background:#000!important;color:#fff!important}
 body.high-contrast .topbar,body.high-contrast header{background:#000!important;color:#fff!important}
 body.high-contrast .demo-pill{background:#fff!important;color:#000!important;border:2px solid #000!important}
 body.high-contrast .care-alert-box{background:#fff!important;color:#000!important;border:3px solid #000!important}
+
+.care-alert.level-red .care-alert-box{border:3px solid #b23a2b}
+.care-alert.level-red .tag{background:#b23a2b;color:#fff}
+.care-alert.level-yellow .care-alert-box{border:3px solid #d99a2b}
+.care-alert.level-yellow .tag{background:#fff3d6;color:#7a4a12}
+.care-alert.level-green .care-alert-box{border:3px solid #2f7d5b}
+.care-alert.level-green .tag{background:#eef8f2;color:#2f5f45}
+button:focus-visible,a:focus-visible,.chip:focus-visible,.mic-button:focus-visible{outline:3px solid #e07a3f;outline-offset:3px}
+.skip-link{position:absolute;left:-999px;top:0;background:#0f4c5c;color:#fff;padding:8px 12px;z-index:200}.skip-link:focus{left:8px;top:8px}
+.phone-actions button,.chip,.link-btn,.composer button{min-height:44px}
