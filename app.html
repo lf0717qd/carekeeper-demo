@@ -127,6 +127,7 @@
   var role = sessionStorage.getItem("ck_role") || "";
   var token = sessionStorage.getItem("ck_token") || "";
   var userName = sessionStorage.getItem("ck_name") || "";
+  var userSite = null;
   var tab = "";
   var selectedPatient = "";
   var patients = {};
@@ -168,7 +169,7 @@
   function speakNext(){
     if(speechState.index>=speechState.chunks.length){speechState.playing=false;speechState.paused=false;speechState.index=0;updateSpeechBar();return}
     var u=new SpeechSynthesisUtterance(speechState.chunks[speechState.index]);
-    u.lang="zh-HK";u.rate=speechRate;u.volume=speechVolume;
+    u.lang=(userSite&&userSite.voice==="zh-HK")?"zh-HK":((userSite&&userSite.dialect==="粤语")?"zh-HK":"zh-CN");u.rate=speechRate;u.volume=speechVolume;
     var vs=availableVoices();
     if(speechVoiceURI){var pick=vs.filter(function(v){return v.voiceURI===speechVoiceURI})[0];if(pick)u.voice=pick}
     else{var hk=vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0];if(hk)u.voice=hk}
@@ -225,7 +226,7 @@
       var r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({account:$("#account").value.trim(),password:$("#password").value})});
       var d=await r.json();
       if(!r.ok) throw new Error(d.error||"登录失败");
-      token=d.token;role=d.role;userName=d.name;
+      token=d.token;role=d.role;userName=d.name;userSite=d.site||null;
       sessionStorage.setItem("ck_token",token);sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
       await loadPatients();tab=navs[role][0][0];$("#error").textContent="";renderShell();
     }catch(e){$("#error").textContent="登录失败："+e.message}
@@ -240,7 +241,7 @@
     try{
       var r=await fetch(API+"/api/auth/me",{headers:{Authorization:"Bearer "+token}});
       if(!r.ok) throw new Error("session");
-      var d=await r.json();role=d.role;userName=d.name;sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
+      var d=await r.json();role=d.role;userName=d.name;userSite=d.site||null;sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
       await loadPatients();tab=navs[role][0][0];renderShell();
     }catch(e){token="";role="";sessionStorage.removeItem("ck_token");renderLogin()}
   }
@@ -248,7 +249,7 @@
   function renderShell(){
     $("#login").classList.add("hidden");$("#shell").classList.remove("hidden");
     $("#rolePill").textContent=roleName(role);$("#whoName").textContent=userName||ACCOUNTS[role].name;
-    $("#topSub").textContent=roleName(role)+" · "+(userName||"演示");
+    $("#topSub").textContent=roleName(role)+" · "+(userName||"演示")+" · "+((userSite&&userSite.name)||"广州荔湾")+" · "+((userSite&&userSite.dialect)||"粤语");
     var nav=$("#nav");nav.innerHTML="";
     navs[role].forEach(function(x){var b=document.createElement("button");b.textContent=x[1];b.className=x[0]===tab?"on":"";b.onclick=function(){tab=x[0];renderShell()};nav.appendChild(b)});
     if(role==="elder") renderElder(); else if(role==="family") renderFamily(); else renderDoctor();
@@ -259,7 +260,7 @@
   }
   function renderElder(){
     var p=patients[Object.keys(patients)[0]];
-    var html='<div class="hero"><h2>'+esc(p.name)+'，早晨</h2><p>今日：量血压 · 早上药 · 下周三复诊</p><div class="row"><span class="mini">血压 '+p.bp+'</span><span class="mini">用药 '+p.med+'</span><span class="mini">下周三复诊</span></div></div>';
+    var html='<div class="hero"><h2>'+esc(p.name)+'，早晨</h2><p>今日：量血压 · 早上药 · 下周三复诊</p><div class="row"><span class="mini">'+(userSite?esc(userSite.name+" · "+userSite.dialect):"广州荔湾 · 粤语")+'</span><span class="mini">血压 '+p.bp+'</span><span class="mini">用药 '+p.med+'</span><span class="mini">下周三复诊</span></div></div>';
     if(tab==="home"){
       html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div><p class="muted">只做健康教育/提醒，不诊断、不开药。</p></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button><p class="muted" style="margin-top:8px">唔识字都可以用；答唔到会帮你叫家人/医生。</p></div></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
@@ -270,7 +271,7 @@
         '<div class="setting-row"><label>语速</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="'+speechRate+'"><span class="setting-val" id="rateVal">'+speechRate.toFixed(2)+'</span></div>'+
         '<div class="setting-row"><label>音量</label><input id="vol" type="range" min="0.3" max="1" step="0.05" value="'+speechVolume+'"><span class="setting-val" id="volVal">'+Math.round(speechVolume*100)+'%</span></div>'+
         '<div class="setting-row"><label>音色</label><select id="voice"><option value="">自动（粤语优先）</option></select></div>'+
-        '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div></div>'+
+        '<div class="call-row"><button id="testVoice">试听</button><button id="resetVoice">恢复默认</button></div>'+((userSite&&userSite.dialect!=="粤语")?'<p class="muted">本站点：'+esc(userSite.dialect)+'，原生音色未接；先用系统中文/粤语音色。</p>':'')+'</div>'+
         '<div class="card" style="margin-top:10px"><h3>粤拼校验</h3><p class="muted">ToJyutping · 只看粤语读音，不改写答案。</p><div class="chat-input"><input id="jpText" value="婆婆換片痛"><button class="primary" id="jpBtn">显示粤拼</button></div><div class="out" id="jpOut" style="margin-top:7px">—</div></div>'+
         '<div class="card" style="margin-top:10px"><h3>离线</h3><p>App 壳可离线打开；对话会提示断网，急症仍显示 120 提示。</p><p class="muted">不是完整离线 ASR/TTS；语音识别仍需网络。</p></div>';
     } else if(tab==="meds"){
