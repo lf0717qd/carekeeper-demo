@@ -317,7 +317,7 @@
     } else if(tab==="chat"){
       html+='<div class="card chat-card">'+
         '<div class="care-mini"><div class="care-mini-head"><strong>今日照护</strong><span><button class="link-btn" type="button" id="previewReminder">预览提醒</button><button class="link-btn" type="button" id="openNotify">开通知</button></span></div><p>饮食：低盐、低糖、少油，按餐吃。用药：氨氯地平 5mg、二甲双胍 0.5g。复诊：2026-11-25 09:00 社区医院二楼慢病门诊。</p></div>'+
-        '<button class="big-mic" id="micBtn" aria-label="按住讲嘢"><svg class="big-mic-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><line x1="12" y1="18" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg><b>按一下<br>讲嘢</b></button>'+
+        '<button class="big-mic" id="micBtn" aria-label="按住讲嘢，松手结束，最多60秒"><svg class="big-mic-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><line x1="12" y1="18" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg><b>按住<br>讲嘢</b></button>'+
         '<div class="chat" id="chat"></div>'+
         '<div class="quick-chips"><button data-quick="我食咗药未">用药</button><button data-quick="我血压高">血压高</button><button data-quick="我心口闷">心口闷</button><button data-quick="几时复诊">复诊</button><button data-quick="帮我出家属报告">家属报告</button></div>'+
         '<div class="chat-input"><input id="chatInput" placeholder="试一句：我今晚可唔可以食粥？"><button class="primary send-arrow" id="chatSend" aria-label="发送">➤</button></div>'+
@@ -370,32 +370,56 @@
     if($("#previewReminder"))$("#previewReminder").onclick=function(){toast("预览：够钟食药啦；复诊记得带血压记录")};
     if($("#openNotify"))$("#openNotify").onclick=function(){toast("请在手机系统设置允许通知")};
     $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last)speakText(last.text);else toast("无播报")};
-    var recorder=null,chunks=[],timer=null;
+    var recorder=null,chunks=[],maxTimer=null,micStarting=false;
     function setMic(s){$("#micStatus").textContent=s}
+    function encodeWav(audioBuffer){
+      var channels=audioBuffer.numberOfChannels,sampleRate=audioBuffer.sampleRate,length=audioBuffer.length,dataSize=length*2,buffer=new ArrayBuffer(44+dataSize),view=new DataView(buffer);
+      function writeStr(offset,str){for(var i=0;i<str.length;i+=1)view.setUint8(offset+i,str.charCodeAt(i))}
+      writeStr(0,"RIFF");view.setUint32(4,36+dataSize,true);writeStr(8,"WAVE");writeStr(12,"fmt ");view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);writeStr(36,"data");view.setUint32(40,dataSize,true);
+      var data=[];for(var c=0;c<channels;c+=1)data.push(audioBuffer.getChannelData(c));var offset=44;
+      for(var i=0;i<length;i+=1){var sample=0;for(var c=0;c<channels;c+=1)sample+=data[c][i];sample/=channels;sample=Math.max(-1,Math.min(1,sample));view.setInt16(offset,sample<0?sample*0x8000:sample*0x7FFF,true);offset+=2}
+      return buffer;
+    }
+    function arrayBufferToBase64(buffer){var bytes=new Uint8Array(buffer),binary="",chunk=0x8000;for(var i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));return btoa(binary)}
     async function startMic(){
+      if(recorder||micStarting)return;
       if(!navigator.mediaDevices||!window.MediaRecorder){setMic("呢部机唔支持录音；请打字");return}
+      micStarting=true;
       try{
         var stream=await navigator.mediaDevices.getUserMedia({audio:true});
         chunks=[];recorder=new MediaRecorder(stream);
         recorder.ondataavailable=function(e){if(e.data.size)chunks.push(e.data)};
         recorder.onstop=async function(){
-          stream.getTracks().forEach(function(t){t.stop()});
-          var blob=new Blob(chunks,{type:chunks[0]&&chunks[0].type||"audio/webm"});
-          var reader=new FileReader();
-          reader.onloadend=async function(){
-            var b64=String(reader.result||"").split(",")[1]||"";
-            setMic("识别中…");
-            try{var r=await fetch(API+"/api/asr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64})});var d=await r.json();if(!r.ok||!d.text)throw new Error(d.error||"ASR失败");$("#chatInput").value=d.text;setMic("识别到："+d.text);}
-            catch(e){setMic("识别失败："+e.message+"；可以打字")}
-          };
-          reader.readAsDataURL(blob);
+          stream.getTracks().forEach(function(t){t.stop()});recorder=null;clearTimeout(maxTimer);
+          if(!chunks.length){setMic("未录到声音，再试一次");return}
+          setMic("识别紧…");
+          try{
+            var blob=new Blob(chunks,{type:chunks[0].type||"audio/webm"});
+            var arrayBuffer=await blob.arrayBuffer();
+            var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+            var audioBuffer=await audioCtx.decodeAudioData(arrayBuffer.slice(0));await audioCtx.close();
+            var wav=encodeWav(audioBuffer),b64=arrayBufferToBase64(wav);
+            var r=await fetch(API+"/api/asr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64,mime:"audio/wav"})});
+            var d=await r.json();if(!r.ok||!d.text)throw new Error(d.error||"ASR失败");
+            $("#chatInput").value=d.text;setMic("识别到："+d.text);
+          }catch(e){setMic("识别失败："+e.message+"；可以打字")}
         };
-        recorder.start();setMic("录音中…再按一下停止");
-        timer=setTimeout(function(){if(recorder&&recorder.state==="recording")recorder.stop()},6000);
-      }catch(e){setMic("麦克风未授权："+e.message)}
+        recorder.start(250);micStarting=false;setMic("听紧… 松手结束（最多60秒）");
+        maxTimer=setTimeout(function(){if(recorder&&recorder.state==="recording")recorder.stop()},60000);
+      }catch(e){micStarting=false;setMic("麦克风未授权："+e.message)}
     }
-    $("#micBtn").onclick=function(){if(recorder&&recorder.state==="recording"){clearTimeout(timer);recorder.stop()}else{startMic()}};
+    function stopMic(){clearTimeout(maxTimer);if(recorder&&recorder.state==="recording")recorder.stop()}
+    var micEl=$("#micBtn");
+    if(micEl){
+      micEl.addEventListener("pointerdown",function(e){e.preventDefault();try{micEl.setPointerCapture(e.pointerId)}catch(err){}startMic()});
+      micEl.addEventListener("pointerup",function(e){e.preventDefault();stopMic()});
+      micEl.addEventListener("pointercancel",stopMic);
+      micEl.addEventListener("pointerleave",function(){if(recorder)stopMic()});
+      micEl.addEventListener("keydown",function(e){if(e.key===" "||e.key==="Enter"){e.preventDefault();startMic()}});
+      micEl.addEventListener("keyup",function(e){if(e.key===" "||e.key==="Enter"){e.preventDefault();stopMic()}});
+    }
   }
+
 
   function bindSettings(){
     var vs=availableVoices();var sel=$("#voice");
