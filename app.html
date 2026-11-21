@@ -138,7 +138,7 @@
     family: {name:"陈先生", label:"家人端", account:"13800000002", password:"123456"},
     doctor: {name:"李医生", label:"医生端", account:"13800000003", password:"123456"}
   };
-  var role = sessionStorage.getItem("ck_role") || "";
+  var role = sessionStorage.getItem("ck_role") || qp.get("role") || "";
   var token = sessionStorage.getItem("ck_token") || "";
   var userName = sessionStorage.getItem("ck_name") || "";
   var userSite = null;
@@ -229,6 +229,7 @@
       b.onclick=function(){role=r;$("#account").value=a.account;$("#password").value=a.password;renderLogin();};
       box.appendChild(b);
     });
+    if (role && ACCOUNTS[role]) { $("#account").value = ACCOUNTS[role].account; $("#password").value = ACCOUNTS[role].password; }
   }
   async function loadPatients(){
     var r=await apiFetch("/api/app/patients");
