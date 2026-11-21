@@ -137,6 +137,7 @@
     doctor: [["patients","我的老人"],["summary","只读摘要"],["alerts","告警"]]
   };
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
+  var agentState = {};
   var prefs = {};
   try { prefs = JSON.parse(localStorage.getItem("ck_speech_prefs") || "{}") || {}; } catch(e) { prefs = {}; }
   var speechRate = Number(prefs.rate || 0.82);
@@ -294,8 +295,10 @@
       var input=$("#chatInput");var text=input.value.trim();if(!text)return;input.value="";
       state.messages.push({role:"user",text:text});draw();
       try{
-        var r=await fetch(API+"/api/app/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"X-Request-ID":"APP-"+Date.now()},body:JSON.stringify({patient_id:Object.keys(patients)[0],message:text,history:state.messages.slice(-6)})});
-        var d=await r.json();state.messages.push({role:"agent",text:d.reply||"我而家未系好听得明。"});
+        var r=await fetch(API+"/api/agent/turn",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token,"X-Request-ID":"APP-"+Date.now()},body:JSON.stringify({patient_id:Object.keys(patients)[0],message:text,state:agentState})});
+        var d=await r.json();
+        if(r.ok && d.state) agentState=d.state;
+        state.messages.push({role:"agent",text:d.reply||"我而家未系好听得明。",meta:(d.intent||"")+" / "+(d.action||"")});
       }catch(e){
         if(!navigator.onLine){ try{var q=JSON.parse(localStorage.getItem("ck_offline_queue")||"[]");q.push({text:text,at:Date.now()});localStorage.setItem("ck_offline_queue",JSON.stringify(q.slice(-20)))}catch(err){} }
         state.messages.push(offlineReply(text));
@@ -326,7 +329,7 @@
     var p=patients[Object.keys(patients)[0]];
     var html='<div class="hero"><h2>陈婆婆 · 家人端</h2><p>已授权 · 只读摘要 · 陈先生</p><div class="row"><span class="mini">授权：有效</span><span class="mini">数据：今日</span><span class="mini">来源：KB v0.2</span></div></div>';
     if(tab==="overview"){
-      html+='<div class="grid"><div class="card"><h3>今日摘要</h3><p>血压 '+p.bp+'；用药 '+p.med+'；下周三复诊。</p><p class="muted">不是诊断，不替代医生。</p></div><div class="card"><h3>红线</h3>'+(p.alerts.length?p.alerts.map(alertHTML).join(""):'<p>今日未出现红线。</p>')+'</div></div>';
+      html+='<div class="grid"><div class="card"><h3>今日摘要</h3><p>血压 '+p.bp+'；用药 '+p.med+'；下周三复诊。</p><p class="muted">不是诊断，不替代医生。</p><button class="ghost" id="voiceReceipt">语音播报回执</button></div><div class="card"><h3>红线</h3>'+(p.alerts.length?p.alerts.map(alertHTML).join(""):'<p>今日未出现红线。</p>')+'</div></div>';
     } else if(tab==="alerts"){
       html+='<div class="card"><h3>红线告警</h3>'+(p.alerts.map(alertHTML).join("")||"<p>今日未出现红线。</p>")+'<p class="muted">家属端站内提醒；不是微信/短信推送。</p></div>';
     } else if(tab==="meds"){
@@ -337,6 +340,9 @@
       html+='<div class="card"><h3>授权</h3><p>授权对象：陈先生（儿子）</p><p>范围：报告/告警/用药/复诊/回执/医生摘要</p><p class="muted">撤回/删除凭证在旧版家人端 Demo；这里展示产品壳。</p><div class="call-row"><button id="revoke">撤回授权（演示）</button><button id="delete">删除今日数据（演示）</button></div></div>';
     }
     $("#content").innerHTML=html;
+    if(tab==="overview" && $("#voiceReceipt")){
+      $("#voiceReceipt").onclick=function(){speakText("今日回执。"+p.name+"，血压 "+p.bp+"，用药完成 "+p.med+"，复诊 "+p.follow+"。如果有胸痛、唞唔到气、晕倒，即刻叫家人或者打 120。")};
+    }
     if(tab==="consent"){
       $("#revoke").onclick=function(){confirm("撤回后家属看不到报告，确定？")&&toast("已模拟撤回授权")};
       $("#delete").onclick=function(){confirm("删除今日数据？不可恢复。")&&toast("已模拟删除，保留凭证")};
