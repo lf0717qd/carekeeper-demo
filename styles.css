@@ -1015,3 +1015,23 @@ body.static *, body.static *::before, body.static *::after {
 .offline-notice strong { color: #a34e16; flex: 0 0 auto; }
 .offline-notice span { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
 .offline-notice.hidden { display: none; }
+
+/* customer feedback: elder large mode / call confirmation */
+body.large-mode .bubble{font-size:16px!important;line-height:1.65}
+body.large-mode .mic-text{font-size:15px!important}
+body.large-mode .mic-button{width:190px!important;height:190px!important}
+body.large-mode .mic-hint{font-size:12.5px!important}
+body.large-mode .chip{font-size:13px!important;padding:8px 11px!important}
+body.large-mode .phone-actions button{font-size:13px!important;padding:9px 10px!important}
+body.large-mode .composer input{font-size:15px!important;padding:11px!important}
+body.large-mode .today-strip{font-size:13px!important}
+body.large-mode .alert-banner strong{font-size:13px!important}
+body.large-mode .alert-banner span{font-size:12px!important}
+body.large-mode .voice-label,body.large-mode .switch-label{font-size:12px!important}
+body.large-mode .link-btn{font-size:12px!important}
+.call-confirm{position:fixed;inset:0;background:rgba(15,40,45,.45);display:none;place-items:center;z-index:100;padding:18px}
+.call-confirm.show{display:grid}
+.call-confirm-box{background:#fffdf8;border-radius:16px;padding:18px;max-width:360px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.2)}
+.call-confirm-box h3{margin:0 0 6px;font-size:17px;color:#17363d}
+.call-confirm-box p{margin:0 0 12px;font-size:13px;color:#52676a;line-height:1.6}
+.call-confirm-box button{border:0;border-radius:9px;padding:9px 14px;background:#0f4c5c;color:#fff;font-size:13px;cursor:pointer}
