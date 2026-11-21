@@ -1074,3 +1074,5 @@ body.high-contrast .care-alert-box{background:#fff!important;color:#000!importan
 button:focus-visible,a:focus-visible,.chip:focus-visible,.mic-button:focus-visible{outline:3px solid #e07a3f;outline-offset:3px}
 .skip-link{position:absolute;left:-999px;top:0;background:#0f4c5c;color:#fff;padding:8px 12px;z-index:200}.skip-link:focus{left:8px;top:8px}
 .phone-actions button,.chip,.link-btn,.composer button{min-height:44px}
+
+.mic-hint:has(#micHint:empty){display:none}
