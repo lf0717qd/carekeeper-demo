@@ -76,6 +76,19 @@
   .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
   .speech-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f4c5c;color:#fff;border-radius:12px;padding:8px 11px;font-size:11px;display:flex;gap:8px;align-items:center;z-index:25;box-shadow:0 8px 24px rgba(15,76,92,.25)}.speech-bar.hidden{display:none}.speech-bar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:3px 7px;font-size:10px;cursor:pointer}
   .muted{color:var(--muted);font-size:10px}
+  .elder-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .elder-tabs button{border:1px solid #cfdedb;background:#fff;color:var(--teal);border-radius:10px;padding:8px 11px;font-size:12px;cursor:pointer}
+  .elder-tabs button.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+  body.elder-role .side{display:none}
+  body.elder-role .main{grid-template-columns:1fr}
+  body.elder-role .content{grid-column:1;font-size:15px}
+  body.elder-role .card p,body.elder-role .list .item,body.elder-role .chat .b{font-size:13px!important;line-height:1.7}
+  body.elder-role .hero h2{font-size:25px}
+  body.elder-role .stat b{font-size:24px}
+  body.elder-role .stat span{font-size:11px}
+  body.elder-role .card h3{font-size:15px}
+  body.elder-role .mic.small{font-size:15px;padding:12px 16px}
+  @media(max-width:760px){body.elder-role .main{grid-template-columns:1fr}}
   @media(max-width:760px){.roles{grid-template-columns:1fr}.form{grid-template-columns:1fr}.main{grid-template-columns:1fr;padding:9px}.side{order:2}.nav{flex-direction:row;overflow:auto}.doctor-row{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.login-card{padding:18px}.hero h2{font-size:18px}}
 </style>
 </head>
@@ -85,15 +98,15 @@
   <div class="login-card">
     <div class="brand"><div class="logo">乡</div><div><h1>乡音健康管家</h1><p>粤语优先 · 居家健康智能体 · 三端 App</p></div></div>
     <h2 class="login-title">登录</h2>
-    <p class="login-sub">演示账号：选择角色后自动填入；生产环境使用手机号 OTP / 微信 OAuth / 医生 MFA。</p>
+
     <div class="roles" id="roles"></div>
     <div class="form">
       <div><label>账号</label><input id="account" autocomplete="username"></div>
       <div><label>密码 / 验证码</label><input id="password" type="password" autocomplete="current-password" value="123456"></div>
     </div>
     <div class="error" id="error"></div>
-    <div class="login-actions"><button class="primary" id="loginBtn">登录</button><span class="muted">演示环境，非真实认证</span></div>
-    <div class="demo-list">老人：13800000001 · 家人：13800000002 · 医生：13800000003 · 密码均为 123456</div>
+    <div class="login-actions"><button class="primary" id="loginBtn">登录</button></div>
+
   </div>
 </div>
 
@@ -146,7 +159,7 @@
   var selectedPatient = "";
   var patients = {};
   var navs = {
-    elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"],["settings","语音设置"]],
+    elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"]],
     family: [["overview","今日报告"],["alerts","红线告警"],["meds","用药/复诊"],["doctor","医生摘要"],["consent","授权"]],
     doctor: [["patients","我的老人"],["summary","只读摘要"],["alerts","告警"]]
   };
@@ -225,7 +238,7 @@
     var box=$("#roles");box.innerHTML="";
     ["elder","family","doctor"].forEach(function(r){
       var a=ACCOUNTS[r];var b=document.createElement("button");b.type="button";b.className="role"+(r===role?" on":"");
-      b.innerHTML='<div class="ico">'+(r==="elder"?"👵":r==="family"?"👨‍👩‍👧":"🩺")+'</div><strong>'+a.label+'</strong><span>'+a.name+' · '+a.account+'</span>';
+      b.innerHTML='<div class="ico">'+(r==="elder"?"👵":r==="family"?"👨‍👩‍👧":"🩺")+'</div><strong>'+a.label+'</strong>';
       b.onclick=function(){role=r;$("#account").value=a.account;$("#password").value=a.password;renderLogin();};
       box.appendChild(b);
     });
@@ -270,6 +283,7 @@
     $("#topSub").textContent=roleName(role)+" · "+(userName||"演示")+" · "+((userSite&&userSite.name)||"广州荔湾")+" · "+((userSite&&userSite.dialect)||"粤语");
     var nav=$("#nav");nav.innerHTML="";
     navs[role].forEach(function(x){var b=document.createElement("button");b.textContent=x[1];b.className=x[0]===tab?"on":"";b.onclick=function(){tab=x[0];renderShell()};nav.appendChild(b)});
+    document.body.classList.toggle("elder-role", role==="elder");
     if(role==="elder") renderElder(); else if(role==="family") renderFamily(); else renderDoctor();
   }
 
@@ -279,8 +293,9 @@
   function renderElder(){
     var p=patients[Object.keys(patients)[0]];
     var html='<div class="hero"><h2>'+esc(p.name)+'，早晨</h2><p>今日：量血压 · 早上药 · 下周三复诊</p><div class="row"><span class="mini">'+(userSite?esc(userSite.name+" · "+userSite.dialect):"广州荔湾 · 粤语")+'</span><span class="mini">血压 '+p.bp+'</span><span class="mini">用药 '+p.med+'</span><span class="mini">下周三复诊</span></div></div>';
+    html+='<div class="elder-tabs">'+navs.elder.map(function(x){return '<button data-etab="'+x[0]+'" class="'+(x[0]===tab?'on':'')+'">'+x[1]+'</button>'}).join("")+'</div>';
     if(tab==="home"){
-      html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div><p class="muted">只做健康教育/提醒，不诊断、不开药。</p></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button><p class="muted" style="margin-top:8px">唔识字都可以用；答唔到会帮你叫家人/医生。</p></div></div>';
+      html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button></div></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
     } else if(tab==="chat"){
       html+='<div class="card"><h3>同我讲</h3><p class="muted">按「讲嘢」录 6 秒，识别后填入；也可以打字。</p><div class="chat" id="chat"></div><div class="chat-input"><input id="chatInput" placeholder="例如：我今日血压高"><button class="primary" id="chatSend">发送</button><button class="ghost" id="micBtn">🎤 讲嘢</button></div><p class="muted" id="micStatus">按「讲嘢」录 6 秒，识别后填入。</p><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button><button id="speakLast">播报最后一条</button></div></div>';
@@ -299,6 +314,7 @@
       html+='<div class="card"><h3>家人 / 医生</h3><p>家人：陈先生（已授权）</p><p>医生：社区医院李医生（只读）</p><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button></div><p class="muted">演示：不真实外呼。</p></div>';
     }
     $("#content").innerHTML=html;
+    document.querySelectorAll("[data-etab]").forEach(function(b){b.onclick=function(){tab=b.dataset.etab;renderShell()}});
     if(tab==="home"){var b=$("#toChat");if(b)b.onclick=function(){tab="chat";renderShell()}}
     if(tab==="chat"){bindChat();}
     if(tab==="settings"){bindSettings();}
