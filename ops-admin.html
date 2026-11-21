@@ -54,7 +54,7 @@
   var qp=new URLSearchParams(location.search); if(qp.get("api")) API=qp.get("api").replace(/\/+$/,"");
   var token=sessionStorage.getItem("ck_admin_token")||"";
   var tab="overview", data=null;
-  var tabs=[["overview","总览"],["feedback","满意度/回访"],["templates","话术 A/B"],["annotations","标注"],["releases","灰度发布"],["terms","词表审核"],["sites","站点默认"],["hotwords","热词"]];
+  var tabs=[["overview","总览"],["feedback","满意度/回访"],["templates","话术 A/B"],["annotations","标注"],["releases","灰度发布"],["terms","词表审核"],["sites","站点默认"],["hotwords","热词"],["handoffs","转人工"],["features","功能开关"]];
   var $=function(s){return document.querySelector(s)};
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
   function toast(t){var e=$("#toast");e.textContent=t;e.style.opacity=1;setTimeout(function(){e.style.opacity=0},1800)}
@@ -94,6 +94,14 @@
       data.releases.map(function(x){return '<tr><td>'+esc(x.version)+'</td><td>'+x.percent+'%</td><td>'+pill(x.status)+'</td><td>'+esc(x.note||"")+'</td><td class="actions"><button data-rel="'+x.id+'" data-st="stable">全量</button><button data-rel="'+x.id+'" data-st="rolled_back">回滚</button></td></tr>'}).join("")+'</tbody></table><p class="note">只改数据库记录，不切真实流量；生产要网关/配置中心/健康检查。</p></div>';
       $("#relAdd").onclick=async function(){try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({version:$("#relVer").value.trim(),percent:Number($("#relPct").value||10),note:"运营后台创建"})});data=d.overview;render();toast("已创建灰度记录")}catch(e){toast(e.message)}};
       document.querySelectorAll("[data-rel]").forEach(function(b){b.onclick=async function(){if(!confirm("确认更新发布状态？"))return;try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({id:Number(b.dataset.rel),status:b.dataset.st})});data=d.overview;render();toast("已更新")}catch(e){toast(e.message)}}});
+    } else if(tab==="features"){
+      c.innerHTML='<div class="card"><h3>功能开关 / 降级</h3><table><thead><tr><th>开关</th><th>状态</th><th>说明</th><th>操作</th></tr></thead><tbody>'+
+      data.features.map(function(x){return '<tr><td><strong>'+esc(x.name)+'</strong></td><td>'+(x.enabled?'<span class="pill good">开</span>':'<span class="pill bad">关</span>')+'</td><td>'+esc(x.note||"")+'</td><td class="actions"><button data-feat="'+x.name+'" data-en="'+(x.enabled?0:1)+'">'+(x.enabled?"关闭":"开启")+'</button></td></tr>'}).join("")+'</tbody></table><p class="note">维护模式/关闭LLM后接口返回降级话术；不是生产配置中心。</p></div>';
+      document.querySelectorAll("[data-feat]").forEach(function(b){b.onclick=async function(){try{var d=await api("/api/admin/features",{method:"POST",body:JSON.stringify({name:b.dataset.feat,enabled:b.dataset.en==="1"})});data=d.overview;render();toast("已更新")}catch(e){toast(e.message)}}});
+    } else if(tab==="handoffs"){
+      c.innerHTML='<div class="card"><h3>转人工队列</h3><table><thead><tr><th>老人</th><th>原因</th><th>状态</th><th>处理人</th><th>时间</th><th>操作</th></tr></thead><tbody>'+
+      data.handoffs.map(function(x){return '<tr><td>'+esc(x.patient_id)+'</td><td>'+esc(x.reason)+'</td><td>'+pill(x.status)+'</td><td>'+esc(x.owner||"—")+'</td><td>'+esc(x.created_at)+'</td><td class="actions"><button data-ho="'+x.id+'" data-st="claimed">认领</button><button data-ho="'+x.id+'" data-st="done">完成</button></td></tr>'}).join("")+'</tbody></table><p class="note">SLA 只做字段；没有真实坐席/超时升级。</p></div>';
+      document.querySelectorAll("[data-ho]").forEach(function(b){b.onclick=async function(){try{var d=await api("/api/admin/handoffs",{method:"POST",body:JSON.stringify({id:Number(b.dataset.ho),status:b.dataset.st,owner:"运营"})});data=d.overview;render();toast("已更新")}catch(e){toast(e.message)}}});
     } else if(tab==="hotwords"){
       c.innerHTML='<div class="card"><h3>ASR 热词后处理</h3><div class="formrow"><div><label>误识</label><input id="hwWrong" placeholder="换骗"></div><div><label>改成</label><input id="hwRight" placeholder="换片"></div><button class="primary" id="hwAdd">新增</button></div><table style="margin-top:9px"><thead><tr><th>误识</th><th>改成</th><th>状态</th><th>备注</th><th>操作</th></tr></thead><tbody>'+
       data.hotwords.map(function(x){return '<tr><td>'+esc(x.wrong)+'</td><td>'+esc(x.right)+'</td><td>'+(x.active?'<span class="pill good">启用</span>':'<span class="pill">停用</span>')+'</td><td>'+esc(x.note||"")+'</td><td class="actions"><button data-hw="'+x.id+'" data-active="'+(x.active?0:1)+'">'+(x.active?"停用":"启用")+'</button></td></tr>'}).join("")+'</tbody></table><p class="note">只做 ASR 返回后的纠错，不改 ASR 请求；不是声学热词偏置。</p></div>';
