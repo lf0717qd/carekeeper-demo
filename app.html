@@ -98,6 +98,7 @@
 </div>
 
 <div id="offlineBar" class="offline-bar hidden">而家断网：仍可看今日信息；急症请直接叫家人/120。</div>
+<div id="maintenanceBar" class="maintenance-bar hidden">系统维护中：暂时答唔到，可以按「叫家人／叫医生」。</div>
 <div id="speechBar" class="speech-bar hidden"><span id="speechStatus">播报中</span><button id="speechPause">暂停</button><button id="speechStop">停止</button></div>
 <div id="shell" class="shell hidden">
   <div class="top">
@@ -138,6 +139,7 @@
   };
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
   var agentState = {};
+  var featureFlags = {};
   var prefs = {};
   try { prefs = JSON.parse(localStorage.getItem("ck_speech_prefs") || "{}") || {}; } catch(e) { prefs = {}; }
   var speechRate = Number(prefs.rate || 0.82);
@@ -292,6 +294,7 @@
     function draw(){chat.innerHTML=state.messages.map(function(m){return '<div class="msg '+m.role+'"><div class="b">'+esc(m.text)+'</div></div>'}).join("");chat.scrollTop=chat.scrollHeight}
     draw();
     async function send(){
+      if(featureFlags.maintenance || featureFlags.agent_enabled===false){toast("系统维护中，暂时答唔到；可以叫家人/医生");return}
       var input=$("#chatInput");var text=input.value.trim();if(!text)return;input.value="";
       state.messages.push({role:"user",text:text});draw();
       try{
@@ -364,12 +367,21 @@
   $("#logout").onclick=logout;
   $("#modalClose").onclick=function(){$("#modal").classList.add("hidden")};
   $("#speechPause").onclick=togglePause;$("#speechStop").onclick=stopSpeech;
+  function updateMaintenance(){
+    var b=$("#maintenanceBar");if(!b)return;
+    var on=!!featureFlags.maintenance || featureFlags.agent_enabled===false;
+    b.classList.toggle("hidden",!on);
+  }
+  async function loadFlags(){
+    try{var r=await fetch(API+"/api/features");if(!r.ok)return;var d=await r.json();featureFlags=d.features||{};updateMaintenance();}catch(e){}
+  }
   function updateOffline(){var b=$("#offlineBar");if(b)b.classList.toggle("hidden",navigator.onLine)}
   window.addEventListener("online",function(){updateOffline();toast("网络返嚟啦")});
   window.addEventListener("offline",function(){updateOffline();toast("已断网，仍可看今日信息")});
   updateOffline();
   if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=function(){if(tab==="settings")bindSettings()};}
   boot();
+  loadFlags();setInterval(loadFlags,30000);
 })();
 </script>
 </body>
