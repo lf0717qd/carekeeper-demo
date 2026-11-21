@@ -999,6 +999,7 @@
   // ---------- mic / input ----------
   function setupAsr() {
     const button = $("#asrModeBtn");
+    if (!button) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       if (button) {
         button.textContent = "浏览器不支持录音";
@@ -1061,7 +1062,7 @@
         clearTimeout(state.recordTimer);
         state.recordTimer = null;
         $("#micBtn").classList.remove("listening");
-        $("#micHint").textContent = "唔识字、唔识用手机，都可以讲";
+        $("#micHint").textContent = "";
         if (state.mediaStream) state.mediaStream.getTracks().forEach((t) => t.stop());
         state.mediaStream = null;
         state.mediaRecorder = null;
@@ -1086,7 +1087,7 @@
     } catch (error) {
       state.recording = false;
       $("#micBtn").classList.remove("listening");
-      $("#micHint").textContent = "唔识字、唔识用手机，都可以讲";
+      $("#micHint").textContent = "";
       const message = asrErrorMessage(error.name || "unknown");
       addTrace({ tool: "asr.error", title: "录音失败", detail: (error.name || "unknown") + " · " + message, tone: "danger" });
       showToast(message);
@@ -1250,7 +1251,7 @@
     const permission = await ensureMicPermission();
     if (!permission.ok) {
       button.classList.remove("listening");
-      hint.textContent = "唔识字、唔识用手机，都可以讲";
+      hint.textContent = "";
       state.realAsr = false;
       const btn = $("#asrModeBtn");
       if (btn) btn.textContent = "用真实语音";
@@ -1292,7 +1293,7 @@
 
     rec.onend = () => {
       button.classList.remove("listening");
-      hint.textContent = "唔识字、唔识用手机，都可以讲";
+      hint.textContent = "";
       state.recognition = null;
       if (finalText.trim()) {
         const text = finalText.trim();
@@ -1307,7 +1308,7 @@
       rec.start();
     } catch (error) {
       button.classList.remove("listening");
-      hint.textContent = "唔识字、唔识用手机，都可以讲";
+      hint.textContent = "";
       showToast("真实语音启动失败，已用模拟输入");
       simulateMic();
     }
@@ -1321,7 +1322,7 @@
     addTrace({ tool: "vad.speech", title: "检测到语音", detail: "模拟粤语输入；真实设备接 ASR" });
     setTimeout(() => {
       button.classList.remove("listening");
-      $("#micHint").textContent = "唔识字、唔识用手机，都可以讲";
+      $("#micHint").textContent = "";
       const text = micPhrases[state.micIndex % micPhrases.length];
       state.micIndex += 1;
       startScenario(route(text), text);
