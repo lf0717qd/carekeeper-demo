@@ -968,6 +968,17 @@
     applyLargeMode();
   });
   applyLargeMode();
+  const contrastBtn = $("#contrastModeBtn");
+  function applyContrast() {
+    const on = localStorage.getItem("ck_high_contrast") === "1";
+    document.body.classList.toggle("high-contrast", on);
+    if (contrastBtn) contrastBtn.textContent = on ? "普通对比" : "高对比";
+  }
+  if (contrastBtn) contrastBtn.addEventListener("click", () => {
+    localStorage.setItem("ck_high_contrast", document.body.classList.contains("high-contrast") ? "0" : "1");
+    applyContrast();
+  });
+  applyContrast();
 
   // ---------- mic / input ----------
   function setupAsr() {
@@ -1842,6 +1853,7 @@
       if (!r.ok) return;
       careData = await r.json();
       renderCareReminder();
+      setupNativeNotifications();
       checkCareReminders(false);
     } catch (e) { /* backend may be older */ }
   }
@@ -1896,6 +1908,36 @@
   if (reminderDemoBtn) reminderDemoBtn.addEventListener("click", previewCareReminder);
   setTimeout(loadCareReminders, 1200);
   setInterval(() => checkCareReminders(false), 30000);
+
+  let nativeNotificationsReady = false;
+  async function setupNativeNotifications() {
+    if (nativeNotificationsReady) return;
+    const cap = window.Capacitor;
+    const LN = cap && cap.Plugins && cap.Plugins.LocalNotifications;
+    if (!LN || !cap.isNativePlatform || !cap.isNativePlatform()) return;
+    try {
+      let perm = await LN.checkPermissions();
+      if (!perm || perm.display !== "granted") perm = await LN.requestPermissions();
+      if (!perm || perm.display !== "granted") return;
+      await LN.cancel({ notifications: [{ id: 1001 }, { id: 1002 }, { id: 2001 }] });
+      const meds = (careData && careData.medications) || [];
+      const medText = meds.length ? meds.map((m) => m.name + " " + m.dose + " · " + m.instruction).join("；") : "按药袋食药，食完记得打卡";
+      const notifications = [
+        { id: 1001, title: "乡音健康管家 · 早上药", body: medText, schedule: { on: { hour: 8, minute: 0 }, repeats: true, allowWhileIdle: true }, sound: "default" },
+        { id: 1002, title: "乡音健康管家 · 晚上药", body: medText, schedule: { on: { hour: 18, minute: 0 }, repeats: true, allowWhileIdle: true }, sound: "default" }
+      ];
+      const fu = careData && careData.followups && careData.followups[0];
+      if (fu && fu.remind_at) {
+        const at = new Date(String(fu.remind_at).replace(" ", "T"));
+        if (!isNaN(at.getTime()) && at.getTime() > Date.now()) {
+          notifications.push({ id: 2001, title: "乡音健康管家 · 复诊提醒", body: fu.appointment_at + " " + fu.hospital + " " + (fu.department || "") + "，记得带血压记录", schedule: { at, allowWhileIdle: true }, sound: "default" });
+        }
+      }
+      await LN.schedule({ notifications });
+      nativeNotificationsReady = true;
+      addTrace({ tool: "care.notification", title: "系统提醒已排程", detail: "每日 08:00/18:00 + 复诊提醒", tone: "warm" });
+    } catch (e) { /* plugin may be unavailable */ }
+  }
 
   window.__demo = {
     startScenario,
