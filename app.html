@@ -388,9 +388,21 @@
 
   function renderFamily(){
     var p=patients[Object.keys(patients)[0]];
-    var html='<div class="hero"><h2>陈婆婆 · 家人端</h2><p>已授权 · 只读摘要 · 陈先生</p><div class="row"><span class="mini">授权：有效</span><span class="mini">数据：今日</span><span class="mini">来源：KB v0.2</span></div></div>';
+    var html='<div class="hero"><h2>陈婆婆 · 家人端</h2><p>只读摘要 · 陈先生</p><div class="row"><span class="mini">数据：今日</span><span class="mini">来源：KB v0.2</span></div></div>';
     if(tab==="overview"){
-      html+='<div class="grid"><div class="card"><h3>今日摘要</h3><p>血压 '+p.bp+'；用药 '+p.med+'；下周三复诊。</p><p class="muted">不是诊断，不替代医生。</p><button class="ghost" id="voiceReceipt">语音播报回执</button> <a class="ghost" href="care-loop.html" style="text-decoration:none">照护闭环</a></div><div class="card"><h3>红线</h3>'+(p.alerts.length?p.alerts.map(alertHTML).join(""):'<p>今日未出现红线。</p>')+'</div></div>';
+      var today=new Date().toISOString().slice(0,10);
+      var alertBlock=p.alerts.length?p.alerts.map(alertHTML).join(""):'<div class="alert good">今日未出现红线；继续观察血压与用药。</div>';
+      var highCount=p.alerts.filter(function(a){return a.level==="high"}).length;
+      html+='<div class="card"><h3>授权</h3><p>已授权给：<strong>陈先生（儿子）</strong> · 授权时间 '+today+' · 老人可随时撤回</p><p class="muted">家属只能看已授权老人的报告；不能看其他老人，不能改药。</p><div class="call-row"><button class="ghost" id="revoke2">撤回授权</button><button class="ghost" id="delete2">删除今日数据</button></div></div>';
+      html+='<div class="card" style="margin-top:10px"><div style="background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:12px;padding:13px 15px"><div style="font-size:9px;letter-spacing:.12em;opacity:.8">FAMILY REPORT · '+today+'</div><h2 style="margin:4px 0;font-size:20px">'+esc(p.name)+'今日照护报告</h2><div style="font-size:10px;opacity:.85">乡音健康管家 · 粤语优先 · 自动汇总</div></div>'+
+        '<div class="stat-row" style="margin-top:10px"><div class="stat"><b>'+p.bp+'</b><span>血压（最近）</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>'+p.alerts.filter(function(a){return a.level==="high"}).length+'</b><span>红线告警</span></div></div>'+
+        '<h3 style="margin-top:12px">今日摘要</h3><p>今日 3 次对话，已完成用药提醒与血压复测；'+(highCount?'出现 '+highCount+' 条红线，已提示就医。':'未出现红线。')+'</p>'+
+        '<h3 style="margin-top:10px">红线告警</h3>'+alertBlock+
+        '<h3 style="margin-top:10px">复诊提醒</h3><p><strong>'+esc(p.follow)+'</strong><br>带：身份证、医保卡、血压记录；不需要空腹。</p>'+
+        '<h3 style="margin-top:10px">在服药物（只读）</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;color:#6b7b7d;padding:4px">通用名</th><th style="text-align:left;color:#6b7b7d;padding:4px">规格</th><th style="text-align:left;color:#6b7b7d;padding:4px">用法</th></tr></thead><tbody><tr><td style="border-top:1px solid #e8f0ee;padding:4px">氨氯地平</td><td style="border-top:1px solid #e8f0ee;padding:4px">5mg</td><td style="border-top:1px solid #e8f0ee;padding:4px">早上饭后 · 每日 1 次</td></tr><tr><td style="border-top:1px solid #e8f0ee;padding:4px">二甲双胍</td><td style="border-top:1px solid #e8f0ee;padding:4px">0.5g</td><td style="border-top:1px solid #e8f0ee;padding:4px">早晚饭后 · 每日 2 次</td></tr></tbody></table>'+
+        '<p class="muted">只读清单；不调剂量、不建议换药。具体以药袋/医生医嘱为准。</p>'+
+        '<h3 style="margin-top:10px">家属可以做什么</h3><ul style="font-size:11px;line-height:1.8;padding-left:16px"><li>今晚 8 点提醒食晚上药；</li><li>建议家属今晚回电，问下婆婆有冇头晕；</li><li>下星期三 11 月 25 日朝早 9 点复诊，带身份证、医保卡、血压记录。</li></ul>'+
+        '<div class="call-row"><button class="ghost" id="sendReport">发送今日报告</button><button class="ghost" id="voiceReceipt">语音播报回执</button><button class="ghost" id="printReceipt">打印大字回执</button><button class="ghost" id="doctorSummary">医生只读摘要</button><a class="ghost" href="care-loop.html" style="text-decoration:none">照护闭环</a></div></div>';
     } else if(tab==="alerts"){
       html+='<div class="card"><h3>红线告警</h3>'+(p.alerts.map(alertHTML).join("")||"<p>今日未出现红线。</p>")+'<p class="muted">家属端站内提醒；不是微信/短信推送。</p></div>';
     } else if(tab==="meds"){
@@ -401,8 +413,13 @@
       html+='<div class="card"><h3>授权</h3><p>授权对象：陈先生（儿子）</p><p>范围：报告/告警/用药/复诊/回执/医生摘要</p><p class="muted">撤回/删除凭证在旧版家人端 Demo；这里展示产品壳。</p><div class="call-row"><button id="revoke">撤回授权（演示）</button><button id="delete">删除今日数据（演示）</button></div></div>';
     }
     $("#content").innerHTML=html;
-    if(tab==="overview" && $("#voiceReceipt")){
-      $("#voiceReceipt").onclick=function(){speakText("今日回执。"+p.name+"，血压 "+p.bp+"，用药完成 "+p.med+"，复诊 "+p.follow+"。如果有胸痛、唞唔到气、晕倒，即刻叫家人或者打 120。")};
+    if(tab==="overview"){
+      if($("#voiceReceipt"))$("#voiceReceipt").onclick=function(){speakText("今日回执。"+p.name+"，血压 "+p.bp+"，用药完成 "+p.med+"，复诊 "+p.follow+"。如果有胸痛、唞唔到气、晕倒，即刻叫家人或者打 120。")};
+      if($("#sendReport"))$("#sendReport").onclick=function(){toast("今日报告已生成，可发送给家属（演示）")};
+      if($("#revoke2"))$("#revoke2").onclick=function(){confirm("撤回后家属看不到报告，确定？")&&toast("已模拟撤回授权")};
+      if($("#delete2"))$("#delete2").onclick=function(){confirm("删除今日数据？不可恢复。")&&toast("已模拟删除，保留凭证")};
+      if($("#printReceipt"))$("#printReceipt").onclick=function(){openModal("大字回执","<pre style='white-space:pre-wrap;font:inherit'>"+esc(p.name+" 今日照护回执\n血压："+p.bp+"\n用药："+p.med+"\n复诊："+p.follow+"\n红线："+(p.alertText||"今日未出现红线"))+"</pre>")};
+      if($("#doctorSummary"))$("#doctorSummary").onclick=function(){openModal("医生只读摘要","<p><strong>"+esc(p.name)+"</strong> "+p.age+"岁 · "+esc(p.area)+"</p><p>诊断："+esc(p.dx)+"</p><p>今日血压："+esc(p.bp)+"；用药："+esc(p.med)+"。</p><p>复诊："+esc(p.follow)+"</p><p class='muted'>只读；不可开药、不可写回病历。</p>")};
     }
     if(tab==="consent"){
       $("#revoke").onclick=function(){confirm("撤回后家属看不到报告，确定？")&&toast("已模拟撤回授权")};
@@ -423,6 +440,7 @@
   $("#loginBtn").onclick=login;
   $("#password").addEventListener("keydown",function(e){if(e.key==="Enter")login()});
   $("#logout").onclick=logout;
+  function openModal(title, body){$("#modalTitle").textContent=title;$("#modalBody").innerHTML=body;$("#modal").classList.remove("hidden")}
   $("#modalClose").onclick=function(){$("#modal").classList.add("hidden")};
   $("#speechPause").onclick=togglePause;$("#speechStop").onclick=stopSpeech;
   function updateMaintenance(){
