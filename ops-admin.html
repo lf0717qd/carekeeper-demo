@@ -54,7 +54,7 @@
   var qp=new URLSearchParams(location.search); if(qp.get("api")) API=qp.get("api").replace(/\/+$/,"");
   var token=sessionStorage.getItem("ck_admin_token")||"";
   var tab="overview", data=null;
-  var tabs=[["overview","总览"],["feedback","满意度/回访"],["templates","话术 A/B"],["annotations","标注"],["releases","灰度发布"],["terms","词表审核"]];
+  var tabs=[["overview","总览"],["feedback","满意度/回访"],["templates","话术 A/B"],["annotations","标注"],["releases","灰度发布"],["terms","词表审核"],["sites","站点默认"]];
   var $=function(s){return document.querySelector(s)};
   function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
   function toast(t){var e=$("#toast");e.textContent=t;e.style.opacity=1;setTimeout(function(){e.style.opacity=0},1800)}
@@ -94,6 +94,9 @@
       data.releases.map(function(x){return '<tr><td>'+esc(x.version)+'</td><td>'+x.percent+'%</td><td>'+pill(x.status)+'</td><td>'+esc(x.note||"")+'</td><td class="actions"><button data-rel="'+x.id+'" data-st="stable">全量</button><button data-rel="'+x.id+'" data-st="rolled_back">回滚</button></td></tr>'}).join("")+'</tbody></table><p class="note">只改数据库记录，不切真实流量；生产要网关/配置中心/健康检查。</p></div>';
       $("#relAdd").onclick=async function(){try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({version:$("#relVer").value.trim(),percent:Number($("#relPct").value||10),note:"运营后台创建"})});data=d.overview;render();toast("已创建灰度记录")}catch(e){toast(e.message)}};
       document.querySelectorAll("[data-rel]").forEach(function(b){b.onclick=async function(){if(!confirm("确认更新发布状态？"))return;try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({id:Number(b.dataset.rel),status:b.dataset.st})});data=d.overview;render();toast("已更新")}catch(e){toast(e.message)}}});
+    } else if(tab==="sites"){
+      c.innerHTML='<div class="card"><h3>站点默认</h3>'+data.sites.map(function(x){return '<div style="border:1px solid #e8f0ee;border-radius:10px;padding:9px;margin:8px 0"><strong>'+esc(x.name)+'</strong> <span class="pill">'+esc(x.status)+'</span><div class="formrow" style="margin-top:6px"><div><label>方言</label><input data-site="'+x.id+'" data-k="dialect" value="'+esc(x.dialect)+'"></div><div><label>音色</label><input data-site="'+x.id+'" data-k="voice" value="'+esc(x.voice)+'"></div><div><label>告警对象</label><input data-site="'+x.id+'" data-k="alert_target" value="'+esc(x.alert_target)+'"></div><div><label>KB范围</label><input data-site="'+x.id+'" data-k="kb_scope" value="'+esc(x.kb_scope)+'"></div><button class="primary" data-save="'+x.id+'">保存</button></div></div>'}).join("")+'<p class="note">站点默认只影响默认方言/音色/告警对象；潮汕/客家目前 L1，不冒充原生 TTS。</p></div>';
+      document.querySelectorAll("[data-save]").forEach(function(b){b.onclick=async function(){try{var sid=b.dataset.save;var payload={id:sid};document.querySelectorAll('[data-site="'+sid+'"]').forEach(function(inp){payload[inp.dataset.k]=inp.value});var d=await api("/api/admin/sites",{method:"POST",body:JSON.stringify(payload)});data=d.overview;render();toast("站点已更新")}catch(e){toast(e.message)}}});
     } else {
       c.innerHTML='<div class="card"><h3>方言词表审核</h3><table><thead><tr><th>词</th><th>标准/粤拼</th><th>类型</th><th>状态</th><th>意见</th><th>操作</th></tr></thead><tbody>'+
       data.terms.map(function(x){return '<tr><td><strong>'+esc(x.term)+'</strong></td><td>'+esc(x.standard)+'</td><td>'+esc(x.kind)+'</td><td>'+pill(x.status)+'</td><td>'+esc(x.note||"")+'</td><td class="actions"><button data-term="'+x.id+'" data-st="approved">通过</button><button data-term="'+x.id+'" data-st="rejected">退回</button></td></tr>'}).join("")+'</tbody></table><p class="note">这是运营/方言顾问的审核队列；不等于临床签字，也不代表 150 条全审完。</p></div>';
