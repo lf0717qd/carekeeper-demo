@@ -95,24 +95,28 @@
       $("#relAdd").onclick=async function(){try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({version:$("#relVer").value.trim(),percent:Number($("#relPct").value||10),note:"运营后台创建"})});data=d.overview;render();toast("已创建灰度记录")}catch(e){toast(e.message)}};
       document.querySelectorAll("[data-rel]").forEach(function(b){b.onclick=async function(){if(!confirm("确认更新发布状态？"))return;try{var d=await api("/api/admin/releases",{method:"POST",body:JSON.stringify({id:Number(b.dataset.rel),status:b.dataset.st})});data=d.overview;render();toast("已更新")}catch(e){toast(e.message)}}});
     } else if(tab==="users"){
-      c.innerHTML='<div class="card"><h3>创建医生 / 老人账号</h3><p class="note">医生账号由后台创建，医生不能自注册；老人账号可绑定已有老人 ID。</p><div class="formrow"><div><label>角色</label><select id="uRole"><option value="doctor">医生</option><option value="elder">老人</option><option value="family">家人</option></select></div><div><label>姓名</label><input id="uName" placeholder="李医生"></div><div><label>登录账号</label><input id="uAccount" placeholder="13900000001"></div><div><label>初始密码</label><input id="uPassword" value="123456"></div><div><label>老人 ID（老人/家人填）</label><input id="uPids" placeholder="wang"></div><button class="primary" id="uAdd">创建账号</button></div><div id="uList" style="margin-top:10px">加载中…</div></div><div class="card" style="margin-top:10px"><h3>创建老人档案</h3><p class="note">先建老人档案，再用上面的账号绑定老人 ID。</p><div class="formrow"><div><label>老人 ID</label><input id="pId" placeholder="wang2"></div><div><label>姓名</label><input id="pName" placeholder="王婆婆"></div><div><label>年龄</label><input id="pAge" type="number" value="80"></div><div><label>区域</label><input id="pArea" value="广州荔湾"></div><div><label>诊断</label><input id="pDx" value="高血压"></div><button class="primary" id="pAdd">创建档案</button></div></div>';
+      c.innerHTML='<div class="card"><h3>创建医生 / 老人账号</h3><p class="note">医生账号由后台创建，医生不能自注册；老人账号可绑定已有老人 ID。</p><div class="formrow"><div><label>角色</label><select id="uRole"><option value="doctor">医生</option><option value="elder">老人</option><option value="family">家人</option></select></div><div><label>姓名</label><input id="uName" placeholder="李医生"></div><div><label>登录账号</label><input id="uAccount" placeholder="13900000001"></div><div><label>初始密码</label><input id="uPassword" value="123456"></div><div><label>老人 ID（老人/家人填）</label><input id="uPids" placeholder="wang"></div><button class="primary" id="uAdd">创建账号</button></div><div id="uList" style="margin-top:10px">加载中…</div></div><div class="card" style="margin-top:10px"><h3>创建老人档案</h3><p class="note">先建老人档案，再用上面的账号绑定老人 ID。</p><div class="formrow"><div><label>老人 ID</label><input id="pId" placeholder="wang2"></div><div><label>姓名</label><input id="pName" placeholder="王婆婆"></div><div><label>年龄</label><input id="pAge" type="number" value="80"></div><div><label>区域</label><input id="pArea" value="广州荔湾"></div><div><label>诊断</label><input id="pDx" value="高血压"></div><button class="primary" id="pAdd">创建档案</button></div><div id="pList" style="margin-top:8px;font-size:11px">加载中…</div></div>';
       function drawUsers(users){
         $("#uList").innerHTML='<table><thead><tr><th>账号</th><th>角色</th><th>姓名</th><th>老人</th></tr></thead><tbody>'+users.map(function(x){return '<tr><td>'+esc(x.account)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.name)+'</td><td>'+esc((x.patient_ids||[]).join(", ")||"—")+'</td></tr>'}).join("")+'</tbody></table>';
       }
       api("/api/admin/users").then(function(d){drawUsers(d.users||[])}).catch(function(e){$("#uList").textContent=e.message});
+      async function drawPatients(){
+        try{var d=await api("/api/admin/patients");$("#pList").innerHTML='<table><thead><tr><th>ID</th><th>姓名</th><th>年龄</th><th>诊断</th></tr></thead><tbody>'+(d.patients||[]).map(function(x){return '<tr><td><strong>'+esc(x.id)+'</strong></td><td>'+esc(x.name)+'</td><td>'+esc(x.age)+'</td><td>'+esc(x.dx||"—")+'</td></tr>'}).join("")+'</tbody></table>'}catch(e){$("#pList").textContent=e.message}
+      }
+      drawPatients();
       $("#uAdd").onclick=async function(){
         try{
           var pids=$("#uPids").value.trim()?$("#uPids").value.split(",").map(function(x){return x.trim()}).filter(Boolean):[];
           await api("/api/admin/users",{method:"POST",body:JSON.stringify({role:$("#uRole").value,name:$("#uName").value.trim(),account:$("#uAccount").value.trim(),password:$("#uPassword").value,patient_ids:pids})});
           toast("账号已创建");
-          var d=await api("/api/admin/users");drawUsers(d.users||[]);
+          var d=await api("/api/admin/users");drawUsers(d.users||[]);drawPatients();
         }catch(e){toast(e.message)}
       };
       $("#pAdd").onclick=async function(){
         try{
           await api("/api/admin/patients",{method:"POST",body:JSON.stringify({patient_id:$("#pId").value.trim(),name:$("#pName").value.trim(),age:Number($("#pAge").value||0),area:$("#pArea").value.trim(),dx:$("#pDx").value.trim()})});
           toast("老人档案已创建");
-          $("#uPids").value=$("#pId").value.trim();
+          $("#uPids").value=$("#pId").value.trim();drawPatients();
         }catch(e){toast(e.message)}
       };
     } else if(tab==="features"){
