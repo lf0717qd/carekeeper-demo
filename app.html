@@ -428,6 +428,19 @@
       for(var i=0;i<length;i+=1){var sample=0;for(var c=0;c<channels;c+=1)sample+=data[c][i];sample/=channels;sample=Math.max(-1,Math.min(1,sample));view.setInt16(offset,sample<0?sample*0x8000:sample*0x7FFF,true);offset+=2}
       return buffer;
     }
+    function splitWav(wav,maxSeconds){
+      var bytes=new Uint8Array(wav),dv=new DataView(wav);
+      var channels=dv.getUint16(22,true),sampleRate=dv.getUint32(24,true),bits=dv.getUint16(34,true)||16;
+      var block=channels*(bits/8),dataSize=dv.getUint32(40,true),chunkBytes=Math.floor(maxSeconds*sampleRate*block/block)*block;
+      var out=[];
+      for(var off=44;off<44+dataSize;off+=chunkBytes){
+        var len=Math.min(chunkBytes,44+dataSize-off),buf=new Uint8Array(44+len);
+        buf.set(bytes.subarray(0,44),0);buf.set(bytes.subarray(off,off+len),44);
+        var v=new DataView(buf.buffer);v.setUint32(4,36+len,true);v.setUint32(40,len,true);
+        out.push(buf.buffer);
+      }
+      return out.length?out:[wav];
+    }
     function arrayBufferToBase64(buffer){var bytes=new Uint8Array(buffer),binary="",chunk=0x8000;for(var i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));return btoa(binary)}
     async function startMic(){
       if(recorder||micStarting)return;
@@ -446,10 +459,17 @@
             var arrayBuffer=await blob.arrayBuffer();
             var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
             var audioBuffer=await audioCtx.decodeAudioData(arrayBuffer.slice(0));await audioCtx.close();
-            var wav=encodeWav(audioBuffer),b64=arrayBufferToBase64(wav);
-            var r=await fetch(API+"/api/asr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64,mime:"audio/wav"})});
-            var d=await r.json();if(!r.ok||!d.text)throw new Error(d.error||"ASR失败");
-            $("#chatInput").value=d.text;setMic("识别到："+d.text);
+            var wav=encodeWav(audioBuffer),parts=splitWav(wav,29),texts=[];
+            for(var pi=0;pi<parts.length;pi+=1){
+              setMic("识别紧… "+(pi+1)+"/"+parts.length);
+              var b64=arrayBufferToBase64(parts[pi]);
+              var r=await fetch(API+"/api/asr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio_base64:b64,mime:"audio/wav"})});
+              var d=await r.json();if(!r.ok||!d.text)throw new Error(d.error||"ASR失败");
+              texts.push(String(d.text).trim());
+            }
+            var text=texts.join(" ").trim();
+            if(!text)throw new Error("未识别到文字");
+            $("#chatInput").value=text;setMic("识别到："+text);
           }catch(e){setMic("识别失败："+e.message+"；可以打字")}
         };
         recorder.start(250);micStarting=false;setMic("听紧… 松手结束（最多60秒）");
