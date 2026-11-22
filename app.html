@@ -298,6 +298,16 @@
     if(!selectedPatient)return;
     try{var r=await apiFetch("/api/app/observations?patient_id="+encodeURIComponent(selectedPatient));if(r.ok)appObs=await r.json();}catch(e){appObs=null}
   }
+  var appRefreshTimer=null;
+  function startAppRefresh(){
+    if(appRefreshTimer)clearInterval(appRefreshTimer);
+    appRefreshTimer=setInterval(async function(){
+      if(document.hidden||(role!=="elder"&&role!=="family"))return;
+      var before=JSON.stringify(appObs);
+      await loadAppObservations();
+      if(JSON.stringify(appObs)!==before && ["home","overview","meds"].indexOf(tab)>=0)renderShell();
+    },30000);
+  }
   async function login(){
     if(!role){$("#error").textContent="请先选择角色";return}
     $("#error").textContent="登录中…";
@@ -307,12 +317,12 @@
       if(!r.ok) throw new Error(d.error||"登录失败");
       token=d.token;role=d.role;userName=d.name;userSite=d.site||null;
       sessionStorage.setItem("ck_token",token);sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
-      await loadPatients();if(role==="doctor")await loadDoctorData();else await loadAppObservations();tab=navs[role][0][0];$("#error").textContent="";renderShell();
+      await loadPatients();if(role==="doctor")await loadDoctorData();else {await loadAppObservations();startAppRefresh();}tab=navs[role][0][0];$("#error").textContent="";renderShell();
     }catch(e){$("#error").textContent="登录失败："+e.message}
   }
   function logout(){
     if(token) fetch(API+"/api/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+token}}).catch(function(){});
-    token="";role="";userName="";patients={};selectedPatient="";
+    token="";role="";userName="";patients={};selectedPatient="";appObs=null;if(appRefreshTimer){clearInterval(appRefreshTimer);appRefreshTimer=null;}
     sessionStorage.removeItem("ck_token");sessionStorage.removeItem("ck_role");sessionStorage.removeItem("ck_name");renderLogin();
   }
   async function boot(){
@@ -321,7 +331,7 @@
       var r=await apiFetch("/api/auth/me");
       if(!r.ok) throw new Error("session");
       var d=await r.json();role=d.role;userName=d.name;userSite=d.site||null;sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
-      await loadPatients();if(role==="doctor")await loadDoctorData();else await loadAppObservations();tab=navs[role][0][0];renderShell();
+      await loadPatients();if(role==="doctor")await loadDoctorData();else {await loadAppObservations();startAppRefresh();}tab=navs[role][0][0];renderShell();
     }catch(e){token="";role="";sessionStorage.removeItem("ck_token");renderLogin()}
   }
 
@@ -367,7 +377,7 @@
         '<div class="card" style="margin-top:10px"><h3>粤拼校验</h3><p class="muted">ToJyutping · 只看粤语读音，不改写答案。</p><div class="chat-input"><input id="jpText" value="婆婆換片痛"><button class="primary" id="jpBtn">显示粤拼</button></div><div class="out" id="jpOut" style="margin-top:7px">—</div></div>'+
         '<div class="card" style="margin-top:10px"><h3>离线</h3><p>App 壳可离线打开；对话会提示断网，急症仍显示 120 提示。</p><p class="muted">不是完整离线 ASR/TTS；语音识别仍需网络。</p></div>';
     } else if(tab==="meds"){
-      html+='<div class="card"><h3>用药（只读）</h3><div class="list"><div class="item"><span>氨氯地平 5mg · 早上</span><span class="pill">按医嘱</span></div><div class="item"><span>二甲双胍 0.5g · 早晚</span><span class="pill">按医嘱</span></div></div><p class="muted">不调剂量、不换药；有疑问问医生/药师。</p></div>';
+      var emp=(appObs&&appObs.med_plans)||[];html+='<div class="card"><h3>用药（医生方案，只读）</h3><div class="list">'+(emp.length?emp.map(function(x){return '<div class="item"><span>'+esc(x.drug)+' '+esc(x.dose)+' · '+esc(x.frequency)+'</span><span class="pill">'+esc(x.doctor||"医生")+'</span></div>'}).join(""):'<p class="muted">医生还未开用药方案。</p>')+'</div><p class="muted">不调剂量、不换药；有疑问问医生/药师。</p></div>';
     } else {
       html+='<div class="card"><h3>家人 / 医生</h3><p>家人：陈先生（已授权）</p><p>医生：社区医院李医生（只读）</p><div class="call-row"><button data-call="family">叫家人</button><button data-call="doctor">叫医生</button></div><p class="muted">演示：不真实外呼。</p></div>';
     }
@@ -478,13 +488,15 @@
       var today=new Date().toISOString().slice(0,10);
       var alertBlock=p.alerts.length?p.alerts.map(alertHTML).join(""):'<div class="alert good">今日未出现红线；继续观察血压与用药。</div>';
       var highCount=p.alerts.filter(function(a){return a.level==="high"}).length;
+      var medPlans=(appObs&&appObs.med_plans)||[];
+      var medRows=medPlans.length?medPlans.map(function(x){return '<tr><td style="border-top:1px solid #e8f0ee;padding:4px">'+esc(x.drug)+'</td><td style="border-top:1px solid #e8f0ee;padding:4px">'+esc(x.dose)+'</td><td style="border-top:1px solid #e8f0ee;padding:4px">'+esc(x.frequency)+' · '+esc(x.duration)+'</td></tr>'}).join(""):'<tr><td colspan="3" style="padding:6px;color:#6b7b7d">医生还未开用药方案。</td></tr>';
       html+='<div class="card" style="margin-top:10px"><div style="background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:12px;padding:13px 15px"><div style="font-size:9px;letter-spacing:.12em;opacity:.8">FAMILY REPORT · '+today+'</div><h2 style="margin:4px 0;font-size:20px">'+esc(p.name)+'今日照护报告</h2><div style="font-size:10px;opacity:.85">乡音健康管家 · 粤语优先 · 自动汇总</div></div>'+
         '<div class="stat-row" style="margin-top:10px"><div class="stat"><b>'+p.bp+'</b><span>血压（最近）</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>'+p.alerts.filter(function(a){return a.level==="high"}).length+'</b><span>红线告警</span></div></div>'+
         '<h3 style="margin-top:12px">今日摘要</h3><p>今日 3 次对话，已完成用药提醒与血压复测；'+(highCount?'出现 '+highCount+' 条红线，已提示就医。':'未出现红线。')+'</p>'+
         '<h3 style="margin-top:10px">今日身体（医生记录）</h3><p class="muted">绑定医生：'+esc((appObs&&appObs.doctor&&appObs.doctor.name)||"未绑定")+'</p>'+((appObs&&appObs.observations&&appObs.observations[0])?('<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody><tr><td>心率</td><td>'+appObs.observations[0].heart_rate+' bpm</td></tr><tr><td>血压</td><td>'+appObs.observations[0].systolic+'/'+appObs.observations[0].diastolic+' mmHg</td></tr><tr><td>呼吸</td><td>'+appObs.observations[0].respiratory_rate+' 次/分</td></tr><tr><td>咳痰</td><td>'+esc(appObs.observations[0].sputum)+'</td></tr><tr><td>排尿</td><td>'+esc(appObs.observations[0].urine)+'</td></tr></tbody></table>'):'<p class="muted">医生还未录入今日信息。</p>')+
         '<h3 style="margin-top:10px">红线告警</h3>'+alertBlock+
         '<h3 style="margin-top:10px">复诊提醒</h3><p><strong>'+esc(p.follow)+'</strong><br>带：身份证、医保卡、血压记录；不需要空腹。</p>'+
-        '<h3 style="margin-top:10px">在服药物（只读）</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;color:#6b7b7d;padding:4px">通用名</th><th style="text-align:left;color:#6b7b7d;padding:4px">规格</th><th style="text-align:left;color:#6b7b7d;padding:4px">用法</th></tr></thead><tbody><tr><td style="border-top:1px solid #e8f0ee;padding:4px">氨氯地平</td><td style="border-top:1px solid #e8f0ee;padding:4px">5mg</td><td style="border-top:1px solid #e8f0ee;padding:4px">早上饭后 · 每日 1 次</td></tr><tr><td style="border-top:1px solid #e8f0ee;padding:4px">二甲双胍</td><td style="border-top:1px solid #e8f0ee;padding:4px">0.5g</td><td style="border-top:1px solid #e8f0ee;padding:4px">早晚饭后 · 每日 2 次</td></tr></tbody></table>'+
+        '<h3 style="margin-top:10px">在服药物（医生方案，只读）</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;color:#6b7b7d;padding:4px">通用名</th><th style="text-align:left;color:#6b7b7d;padding:4px">规格</th><th style="text-align:left;color:#6b7b7d;padding:4px">用法</th></tr></thead><tbody>'+medRows+'</tbody></table>'+
         '<p class="muted">只读清单；不调剂量、不建议换药。具体以药袋/医生医嘱为准。</p>'+
         '<h3 style="margin-top:10px">家属可以做什么</h3><ul style="font-size:11px;line-height:1.8;padding-left:16px"><li>今晚 8 点提醒食晚上药；</li><li>建议家属今晚回电，问下婆婆有冇头晕；</li><li>下星期三 11 月 25 日朝早 9 点复诊，带身份证、医保卡、血压记录。</li></ul>'+
         '<div class="call-row"><button class="ghost" id="sendReport">发送今日报告</button><button class="ghost" id="voiceReceipt">语音播报回执</button><button class="ghost" id="printReceipt">打印大字回执</button><button class="ghost" id="doctorSummary">医生只读摘要</button><a class="ghost" href="care-loop.html" style="text-decoration:none">照护闭环</a></div></div>';
@@ -560,7 +572,7 @@
         '<button class="primary" id="saveObs" style="margin-top:8px">保存今日信息</button><p class="muted">保存后老人端/家人端立即可见。</p></div>'+
         '<div class="card" style="margin-top:10px"><h3>最近记录</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>日期</th><th>心率</th><th>血压</th><th>呼吸</th><th>咳痰</th><th>排尿</th></tr></thead><tbody>'+(obs.slice(0,7).map(function(x){return '<tr><td>'+esc(x.observed_date)+'</td><td>'+x.heart_rate+'</td><td>'+x.systolic+'/'+x.diastolic+'</td><td>'+x.respiratory_rate+'</td><td>'+esc(x.sputum)+'</td><td>'+esc(x.urine)+'</td></tr>'}).join("")||'<tr><td colspan="6">暂无</td></tr>')+'</tbody></table></div>';
     } else if(tab==="trends"){
-      html+='<div class="card"><h3>'+esc(p.name)+' · 每日趋势</h3>'+trendSvg(obs)+'<p class="muted">只显示记录值，不做诊断；数据来自医生今日录入。</p></div>';
+      html+='<div class="card"><h3>'+esc(p.name)+' · 每日趋势</h3>'+trendSvg(obs)+'<button class="ghost" id="exportTrend" style="margin-top:6px">导出趋势 CSV</button><p class="muted">只显示记录值，不做诊断；数据来自医生今日录入。</p></div>';
     } else if(tab==="meds"){
       html+='<div class="card"><h3>用药方案 · '+esc(p.name)+'</h3><p class="muted">比赛演示，不写回 HIS；老人端/家人端只读。</p><div class="row2"><label>常用药<select id="planDrug"><option>氨氯地平</option><option>缬沙坦</option><option>美托洛尔</option><option>二甲双胍</option><option>阿卡波糖</option></select></label><label>剂量<input id="planDose" value="5mg"></label><label>频次<input id="planFreq" value="每日1次（早上）"></label><label>疗程<input id="planDuration" value="长期"></label><label>备注<input id="planNote" value="比赛演示"></label></div><button class="primary" id="savePlan" style="margin-top:8px">保存用药方案</button></div>'+
         '<div class="card" style="margin-top:10px"><h3>已保存</h3><div class="list">'+(plans.map(function(x){return '<div class="item"><span><strong>'+esc(x.drug)+'</strong> '+esc(x.dose)+' · '+esc(x.frequency)+' · '+esc(x.duration)+'</span><span class="pill">'+esc(x.doctor)+'</span></div>'}).join("")||'<p class="muted">暂无用药方案。</p>')+'</div></div>';
@@ -579,6 +591,7 @@
     if($("#saveObs"))$("#saveObs").onclick=async function(){
       try{var r=await apiFetch("/api/doctor/observations",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,observed_date:$("#obsDate").value,heart_rate:Number($("#obsHr").value),systolic:Number($("#obsSys").value),diastolic:Number($("#obsDia").value),respiratory_rate:Number($("#obsRr").value),sputum:$("#obsSputum").value,urine:$("#obsUrine").value,note:$("#obsNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorDetail();toast("今日信息已同步");renderShell()}catch(e){toast("保存失败："+e.message)}
     };
+    if($("#exportTrend"))$("#exportTrend").onclick=function(){var rows=(doctorDetail&&doctorDetail.observations)||[];var csv="日期,心率,上压,下压,呼吸,咳痰,排尿\n"+rows.map(function(x){return [x.observed_date,x.heart_rate,x.systolic,x.diastolic,x.respiratory_rate,x.sputum,x.urine].join(",")}).join("\n");var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="trend-"+selectedPatient+".csv";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)};
     if($("#planDrug"))$("#planDrug").onchange=function(){var d={氨氯地平:"5mg",缬沙坦:"80mg",美托洛尔:"25mg",二甲双胍:"0.5g",阿卡波糖:"50mg"};$("#planDose").value=d[this.value]||""};
     if($("#savePlan"))$("#savePlan").onclick=async function(){
       try{var r=await apiFetch("/api/doctor/med-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,drug:$("#planDrug").value,dose:$("#planDose").value,frequency:$("#planFreq").value,duration:$("#planDuration").value,note:$("#planNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorDetail();toast("用药方案已保存");renderShell()}catch(e){toast("保存失败："+e.message)}
