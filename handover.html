@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-HK"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>乡音健康管家 · 交接与测试</title>
+<style>
+body{margin:0;background:#eef4f2;color:#17363d;font-family:"Microsoft YaHei",sans-serif;line-height:1.6}.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{background:#0f4c5c;color:#fff9ef;border-radius:16px;padding:20px 22px}header h1{margin:0 0 4px;font-size:24px}header p{margin:0;font-size:13px;opacity:.9}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:12px}.card{background:#fffdf8;border:1px solid #dce8e5;border-radius:12px;padding:13px}.card h2{font-size:15px;margin:0 0 7px}.card p,.card li{font-size:12px;color:#52676a}.card a.btn{display:inline-block;background:#0f4c5c;color:#fff;text-decoration:none;border-radius:7px;padding:7px 10px;font-size:12px;margin-top:5px}
+table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;color:#5f6f71;border-bottom:1px solid #dce8e5;padding:6px}td{border-bottom:1px dashed #e8f0ee;padding:6px;vertical-align:top}
+.badge{display:inline-block;border-radius:99px;padding:1px 7px;font-size:10px;background:#eef8f2;color:#2f5f45;border:1px solid #cfe5d6}
+.warn{background:#fff8ef;border-color:#efd8c3}.warn h2{color:#7a4326}.check{display:flex;gap:7px;align-items:flex-start;font-size:12px;padding:5px 0}.check input{width:auto;margin-top:3px}
+code{background:#f4f9f7;border:1px solid #e0ece9;border-radius:4px;padding:1px 4px;font-size:11px}
+@media(max-width:600px){header h1{font-size:20px}.wrap{padding:9px}}
+</style></head><body><div class="wrap">
+<header><h1>乡音健康管家 · 交接与测试</h1><p>比赛 Demo · 合成数据 · 只做健康教育与提醒，不诊断、不开药</p></header>
+<div class="grid">
+<section class="card"><h2>老人端</h2><p>按住 60 秒录音、粤语识别、Agent、自动播报。</p><a class="btn" href="app.html?role=elder">打开老人端</a></section>
+<section class="card"><h2>家人端</h2><p>今日报告、红线、授权、医生同步。</p><a class="btn" href="app.html?role=family">打开家人端</a></section>
+<section class="card"><h2>医生端</h2><p>我的老人、档案、今日信息、趋势、用药方案。</p><a class="btn" href="app.html?role=doctor">打开医生端</a></section>
+<section class="card"><h2>运营后台</h2><p>创建医生/老人账号、老人档案。</p><a class="btn" href="ops-admin.html">打开后台</a></section>
+</div>
+<div class="grid">
+<section class="card"><h2>录音 / ASR 自检</h2><p>只测麦克风、录音、粤语转写，不经过 Agent。</p><a class="btn" href="asr-test.html">打开录音自检</a></section>
+<section class="card"><h2>语音播报自检</h2><p>测系统粤语音色、语速、音量。</p><a class="btn" href="tts-test.html">打开播报自检</a></section>
+<section class="card"><h2>Agent 测试</h2><p>输入实际转写文本，记录意图/结果，导出 CSV。</p><a class="btn" href="intent-test.html">打开 Agent 测试</a></section>
+</div>
+<section class="card" style="margin-top:12px"><h2>账号</h2><table><thead><tr><th>角色</th><th>账号</th><th>密码</th></tr></thead><tbody>
+<tr><td>老人</td><td>13800000001</td><td>123456</td></tr>
+<tr><td>家人（陈婆婆）</td><td>13800000002</td><td>123456</td></tr>
+<tr><td>家人（邹生）</td><td>13800000022</td><td>123456</td></tr>
+<tr><td>医生</td><td>13800000003</td><td>123456</td></tr>
+<tr><td>后台</td><td>13800000009</td><td>123456</td></tr>
+</tbody></table><p class="note">账号只用于比赛演示；不要放进公开宣传物料。</p></section>
+<section class="card warn" style="margin-top:12px"><h2>交接前必须过</h2>
+<div class="check"><input type="checkbox" id="c1"><label for="c1">Chrome / Edge 打开，不是微信内置浏览器</label></div>
+<div class="check"><input type="checkbox" id="c2"><label for="c2">地址栏锁 → 麦克风 → 允许；刷新后仍允许</label></div>
+<div class="check"><input type="checkbox" id="c3"><label for="c3">按住录音 3–10 秒，松手后出现文字</label></div>
+<div class="check"><input type="checkbox" id="c4"><label for="c4">“我脚痛”能识别，Agent 不再回答“听唔明”</label></div>
+<div class="check"><input type="checkbox" id="c5"><label for="c5">“我心口闷，唞唔到气”回答急症/120</label></div>
+<div class="check"><input type="checkbox" id="c6"><label for="c6">Agent 回答后自动播报；无粤语音色时有提示</label></div>
+<div class="check"><input type="checkbox" id="c7"><label for="c7">医生改今日信息，家人端 10 秒内更新</label></div>
+</section>
+<section class="card" style="margin-top:12px"><h2>建议测试句</h2><table><thead><tr><th>说</th><th>期望</th></tr></thead><tbody>
+<tr><td>我脚痛</td><td>症状追问：部位/时长/红肿气促</td></tr>
+<tr><td>我今日血压高</td><td>问上压/下压</td></tr>
+<tr><td>我血压190/120</td><td>高危，坐低、叫家人/120</td></tr>
+<tr><td>我心口闷，唞唔到气</td><td>急症，叫家人/120</td></tr>
+<tr><td>我食咗药</td><td>用药打卡提醒</td></tr>
+<tr><td>我漏食药</td><td>不要自己补服，问药师/医生</td></tr>
+<tr><td>我血糖3.0</td><td>低血糖处理 + 叫家人/120</td></tr>
+<tr><td>我跌倒</td><td>急症，不要急起身</td></tr>
+</tbody></table></section>
+<section class="card" style="margin-top:12px"><h2>客户报问题时，让他发这 4 样</h2><ol><li>手机型号 + 浏览器</li><li>说的是哪一句</li><li>屏幕识别出来的文字</li><li>Agent 回答截图 / 录音自检结果</li></ol><p>这样能区分：麦克风 → ASR → Agent，不用猜。</p></section>
+</div></body></html>
