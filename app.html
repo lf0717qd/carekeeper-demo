@@ -102,7 +102,7 @@
   .quick-chips button{border:1px solid #cfdedb;background:#fff;color:#52676a;border-radius:99px;padding:7px 10px;font-size:11px;cursor:pointer}
   .chat-card .chat-input input{font-size:12px;padding:9px}
   .send-arrow{width:42px;min-width:42px;border-radius:50%;font-size:16px;padding:8px}
-  .chat-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:7px}
+  .chat-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
   .chat-actions button{border:1px solid #cfdedb;background:#fff;color:#0f4c5c;border-radius:9px;padding:8px 4px;font-size:11px;cursor:pointer}
   #micStatus:empty{display:none}
   .elder-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -199,6 +199,8 @@
   var agentState = {};
   var featureFlags = {};
   var elderLarge = localStorage.getItem("ck_elder_large") === "1";
+  var autoSpeak = localStorage.getItem("ck_auto_speak") !== "0";
+  var ttsWarned = false;
   var prefs = {};
   try { prefs = JSON.parse(localStorage.getItem("ck_speech_prefs") || "{}") || {}; } catch(e) { prefs = {}; }
   var speechRate = Number(prefs.rate || 0.82);
@@ -234,7 +236,7 @@
     u.lang=(userSite&&userSite.voice==="zh-HK")?"zh-HK":((userSite&&userSite.dialect==="粤语")?"zh-HK":"zh-CN");u.rate=speechRate;u.volume=speechVolume;
     var vs=availableVoices();
     if(speechVoiceURI){var pick=vs.filter(function(v){return v.voiceURI===speechVoiceURI})[0];if(pick)u.voice=pick}
-    else{var hk=vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0];if(hk)u.voice=hk}
+    else{var hk=vs.filter(function(v){return /zh-HK|yue|粤|Cantonese/i.test(v.lang+" "+v.name)})[0];if(hk)u.voice=hk;else if(vs[0]){u.voice=vs[0];if(!ttsWarned){ttsWarned=true;toast("未装粤语音色，先用可用中文声音")}}}
     u.onend=function(){if(!speechState.playing)return;speechState.index++;updateSpeechBar();speakNext()};
     u.onerror=function(){speechState.playing=false;updateSpeechBar()};
     speechSynthesis.speak(u);
@@ -370,7 +372,7 @@
         '<div class="quick-chips"><button data-quick="我食咗药未">用药</button><button data-quick="我血压高">血压高</button><button data-quick="我心口闷">心口闷</button><button data-quick="几时复诊">复诊</button><button data-quick="帮我出家属报告">家属报告</button></div>'+
         '<div class="chat-input"><input id="chatInput" placeholder="试一句：我今晚可唔可以食粥？"><button class="primary send-arrow" id="chatSend" aria-label="发送">➤</button></div>'+
         '<p class="muted" id="micStatus"></p>'+
-        '<div class="chat-actions"><button id="speakLast">🔊 重听</button><button data-call="family">👨‍👩‍👧 家人</button><button data-call="doctor">🩺 医生</button></div>'+
+        '<div class="chat-actions"><button id="speakLast">🔊 重听</button><button id="autoSpeakBtn">🔊 自动播报</button><button data-call="family">👨‍👩‍👧 家人</button><button data-call="doctor">🩺 医生</button></div>'+
         '</div>';
     } else if(tab==="settings"){
       html+='<div class="card"><h3>语音设置</h3><p class="muted">调大细声、快慢、拣粤语音色；会记住。</p>'+
@@ -407,6 +409,7 @@
         var d=await r.json();
         if(r.ok && d.state) agentState=d.state;
         state.messages.push({role:"agent",text:d.reply||"我而家未系好听得明。",meta:(d.intent||"")+" / "+(d.action||"")});
+        if(autoSpeak)speakText(d.reply||"");
       }catch(e){
         if(!navigator.onLine){ try{var q=JSON.parse(localStorage.getItem("ck_offline_queue")||"[]");q.push({text:text,at:Date.now()});localStorage.setItem("ck_offline_queue",JSON.stringify(q.slice(-20)))}catch(err){} }
         state.messages.push(offlineReply(text));
@@ -418,6 +421,9 @@
     if($("#previewReminder"))$("#previewReminder").onclick=function(){toast("预览：够钟食药啦；复诊记得带血压记录")};
     if($("#openNotify"))$("#openNotify").onclick=function(){toast("请在手机系统设置允许通知")};
     $("#speakLast").onclick=function(){var last=state.messages.filter(function(m){return m.role==="agent"}).pop();if(last)speakText(last.text);else toast("无播报")};
+    var asb=$("#autoSpeakBtn");
+    function applyAutoSpeak(){if(asb){asb.textContent=autoSpeak?"🔊 自动播报：开":"🔇 自动播报：关"}}
+    if(asb){asb.onclick=function(){autoSpeak=!autoSpeak;localStorage.setItem("ck_auto_speak",autoSpeak?"1":"0");applyAutoSpeak();if(!autoSpeak)stopSpeech()};applyAutoSpeak()}
     var recorder=null,chunks=[],maxTimer=null,micStarting=false;
     function setMic(s){$("#micStatus").textContent=s}
     function encodeWav(audioBuffer){
@@ -661,7 +667,7 @@
   window.addEventListener("online",function(){updateOffline();toast("网络返嚟啦")});
   window.addEventListener("offline",function(){updateOffline();toast("已断网，仍可看今日信息")});
   updateOffline();
-  if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=function(){if(tab==="settings")bindSettings()};}
+  if("speechSynthesis" in window){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();if(tab==="settings")bindSettings()};}
   applyElderLarge();
   boot();
   loadFlags();setInterval(loadFlags,30000);
