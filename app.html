@@ -306,7 +306,7 @@
       var before=JSON.stringify(appObs);
       await loadAppObservations();
       if(JSON.stringify(appObs)!==before && ["home","overview","meds"].indexOf(tab)>=0)renderShell();
-    },30000);
+    },10000);
   }
   async function login(){
     if(!role){$("#error").textContent="请先选择角色";return}
@@ -499,7 +499,7 @@
         '<h3 style="margin-top:10px">在服药物（医生方案，只读）</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;color:#6b7b7d;padding:4px">通用名</th><th style="text-align:left;color:#6b7b7d;padding:4px">规格</th><th style="text-align:left;color:#6b7b7d;padding:4px">用法</th></tr></thead><tbody>'+medRows+'</tbody></table>'+
         '<p class="muted">只读清单；不调剂量、不建议换药。具体以药袋/医生医嘱为准。</p>'+
         '<h3 style="margin-top:10px">家属可以做什么</h3><ul style="font-size:11px;line-height:1.8;padding-left:16px"><li>今晚 8 点提醒食晚上药；</li><li>建议家属今晚回电，问下婆婆有冇头晕；</li><li>下星期三 11 月 25 日朝早 9 点复诊，带身份证、医保卡、血压记录。</li></ul>'+
-        '<div class="call-row"><button class="ghost" id="sendReport">发送今日报告</button><button class="ghost" id="voiceReceipt">语音播报回执</button><button class="ghost" id="printReceipt">打印大字回执</button><button class="ghost" id="doctorSummary">医生只读摘要</button><a class="ghost" href="care-loop.html" style="text-decoration:none">照护闭环</a></div></div>';
+        '<div class="call-row"><button class="ghost" id="refreshFamily">刷新</button><button class="ghost" id="sendReport">发送今日报告</button><button class="ghost" id="voiceReceipt">语音播报回执</button><button class="ghost" id="printReceipt">打印大字回执</button><button class="ghost" id="doctorSummary">医生只读摘要</button><a class="ghost" href="care-loop.html" style="text-decoration:none">照护闭环</a></div></div>';
     } else if(tab==="alerts"){
       html+='<div class="card"><h3>红线告警</h3>'+(p.alerts.map(alertHTML).join("")||"<p>今日未出现红线。</p>")+'<p class="muted">家属端站内提醒；不是微信/短信推送。</p></div>';
     } else if(tab==="meds"){
@@ -512,6 +512,7 @@
     $("#content").innerHTML=html;
     if(tab==="overview"){
       if($("#voiceReceipt"))$("#voiceReceipt").onclick=function(){speakText("今日回执。"+p.name+"，血压 "+p.bp+"，用药完成 "+p.med+"，复诊 "+p.follow+"。如果有胸痛、唞唔到气、晕倒，即刻叫家人或者打 120。")};
+      if($("#refreshFamily"))$("#refreshFamily").onclick=async function(){await loadAppObservations();renderShell();toast("已刷新医生记录")};
       if($("#sendReport"))$("#sendReport").onclick=function(){toast("今日报告已生成，可发送给家属（演示）")};
       if($("#printReceipt"))$("#printReceipt").onclick=function(){openModal("大字回执","<pre style='white-space:pre-wrap;font:inherit'>"+esc(p.name+" 今日照护回执\n血压："+p.bp+"\n用药："+p.med+"\n复诊："+p.follow+"\n红线："+(p.alertText||"今日未出现红线"))+"</pre>")};
       if($("#doctorSummary"))$("#doctorSummary").onclick=function(){openModal("医生只读摘要","<p><strong>"+esc(p.name)+"</strong> "+p.age+"岁 · "+esc(p.area)+"</p><p>诊断："+esc(p.dx)+"</p><p>今日血压："+esc(p.bp)+"；用药："+esc(p.med)+"。</p><p>复诊："+esc(p.follow)+"</p><p class='muted'>只读；不可开药、不可写回病历。</p>")};
