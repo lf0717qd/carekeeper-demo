@@ -454,7 +454,14 @@
         };
         recorder.start(250);micStarting=false;setMic("听紧… 松手结束（最多60秒）");
         maxTimer=setTimeout(function(){if(recorder&&recorder.state==="recording")recorder.stop()},60000);
-      }catch(e){micStarting=false;setMic("麦克风未授权："+e.message)}
+      }catch(e){
+        micStarting=false;
+        var msg="麦克风未授权："+(e.message||e.name);
+        if(e.name==="NotAllowedError"||/Permission denied|NotAllowed/i.test(String(e.message))){
+          msg="麦克风被拒绝：手机设置→应用→乡音健康管家→权限→麦克风→允许；网页点地址栏锁→麦克风→允许，然后刷新";
+        }else if(e.name==="NotFoundError"){msg="找不到麦克风；请检查手机是否有麦克风"}
+        setMic(msg);toast(msg);
+      }
     }
     function stopMic(){clearTimeout(maxTimer);if(recorder&&recorder.state==="recording")recorder.stop()}
     var micEl=$("#micBtn");
