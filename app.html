@@ -76,6 +76,11 @@
   .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
   .speech-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f4c5c;color:#fff;border-radius:12px;padding:8px 11px;font-size:11px;display:flex;gap:8px;align-items:center;z-index:25;box-shadow:0 8px 24px rgba(15,76,92,.25)}.speech-bar.hidden{display:none}.speech-bar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:3px 7px;font-size:10px;cursor:pointer}
   .muted{color:var(--muted);font-size:10px}
+  .context-bar{display:flex;align-items:center;gap:7px;background:#fff8ef;border:1px solid #efd8c3;border-radius:9px;padding:7px 10px;margin-top:8px;font-size:11px;color:#7a4326}
+  .context-bar strong{font-size:13px}.context-bar code{background:#fff;border:1px solid #efd8c3;border-radius:4px;padding:1px 4px}
+  .context-bar button{margin-left:auto;border:1px solid #efd8c3;background:#fff;color:#7a4326;border-radius:7px;padding:4px 8px;font-size:10px;cursor:pointer}
+  .safety-check{display:flex;align-items:flex-start;justify-content:flex-start;gap:6px;font-size:11px;color:#7a1b13;background:#fff3f1;border:1px solid #f2c8c3;border-radius:8px;padding:7px;margin-top:8px;line-height:1.5}
+  .safety-check input{width:auto!important;flex:0 0 auto;margin-top:2px}
   .book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
   .book{display:flex;flex-direction:column;align-items:flex-start;gap:3px;border:1px solid #cfdedb;background:linear-gradient(160deg,#fffdf8,#f4f9f7);border-radius:10px;padding:10px;text-align:left;cursor:pointer;color:#17363d}
   .book strong{font-size:14px}.book span{font-size:10px;color:#52676a}
@@ -188,7 +193,7 @@
   var navs = {
     elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"]],
     family: [["overview","今日报告"],["alerts","红线告警"],["meds","用药/复诊"],["doctor","医生摘要"],["consent","授权"]],
-    doctor: [["patients","我的老人"],["profile","档案"],["observations","今日信息"],["trends","趋势"],["meds","用药方案"],["alerts","告警"]]
+    doctor: [["patients","我的老人"],["profile","档案"],["observations","今日信息"],["trends","趋势"],["alerts","告警"]]
   };
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
   var agentState = {};
@@ -548,7 +553,12 @@
     var plans=(doctorDetail&&doctorDetail.med_plans)||[];
     var alerts=(p&&p.alerts)||[];
     var high=alerts.filter(function(a){return a.level==="high"&&!a.handled}).length;
+    var medCard='';
+    if(p){
+      medCard='<div class="card" style="margin-top:10px"><h3>用药方案 · '+esc(p.name)+'</h3><p class="muted">当前老人：<strong>'+esc(p.name)+'</strong>（ID: '+esc(p.id)+'） · 比赛演示，不写回 HIS</p><div class="row2"><label>常用药<select id="planDrug"><option>氨氯地平</option><option>缬沙坦</option><option>美托洛尔</option><option>二甲双胍</option><option>阿卡波糖</option></select></label><label>剂量<input id="planDose" value="5mg"></label><label>频次<input id="planFreq" value="每日1次（早上）"></label><label>疗程<input id="planDuration" value="长期"></label><label>备注<input id="planNote" value="比赛演示"></label></div><label class="safety-check"><input type="checkbox" id="confirmMed"> 我已核对：这是 '+esc(p.name)+'（'+esc(p.id)+'）的药，不是其他老人</label><button class="primary" id="savePlan" style="margin-top:8px">保存用药方案</button><div class="list" style="margin-top:8px">'+(plans.map(function(x){return '<div class="item"><span><strong>'+esc(x.drug)+'</strong> '+esc(x.dose)+' · '+esc(x.frequency)+' · '+esc(x.duration)+'</span><span class="pill">'+esc(x.doctor)+'</span></div>'}).join("")||'<p class="muted">暂无用药方案。</p>')+'</div></div>';
+    }
     var html='<div class="hero"><h2>医生端 · '+esc(userName||"李医生")+'</h2><p>我的老人 · 今日信息 · 趋势 · 用药方案</p><div class="row"><span class="mini">我的老人：'+doctorPatients.length+'</span><span class="mini">高危：'+high+'</span><span class="mini">比赛演示</span></div></div>';
+    if(p&&tab!=="patients")html+='<div class="context-bar"><span>当前老人</span><strong>'+esc(p.name)+'</strong><code>'+esc(p.id)+'</code><button type="button" data-goto-patients>切换老人</button></div>';
     if(!doctorPatients.length){
       html+='<div class="card"><h3>我的老人</h3><p class="muted">还没有绑定老人。后台创建老人账号后，在这里输入老人 ID 绑定。</p><div class="chat-input"><input id="bindPid" placeholder="老人 ID，例如 wang"><button class="primary" id="bindBtn">绑定</button></div></div>';
     } else if(tab==="patients"){
@@ -564,7 +574,7 @@
     } else if(tab==="profile"){
       html+='<div class="card"><h3>'+esc(p.name)+' · 档案</h3><p class="muted">'+p.age+'岁 · '+esc(p.area)+' · '+esc(p.dx)+'</p>'+
         '<div class="row2"><label>病种文件夹<input id="pfFolder" value="'+esc(profile.folder||"")+'" placeholder="高血压/糖尿病"></label><label>诊断<input id="pfDx" value="'+esc(profile.diagnosis||p.dx||"")+'"></label><label>过敏<input id="pfAllergy" value="'+esc(profile.allergies||"")+'" placeholder="无/青霉素"></label><label>备注<input id="pfNote" value="'+esc(profile.note||"")+'"></label></div>'+
-        '<button class="primary" id="saveProfile" style="margin-top:8px">保存档案</button><p class="muted">修改会同步到老人端/家人端；只读端不能改。</p></div>';
+        '<button class="primary" id="saveProfile" style="margin-top:8px">保存档案</button><p class="muted">修改会同步到老人端/家人端；只读端不能改。</p></div>'+medCard;
     } else if(tab==="observations"){
       var today=new Date().toISOString().slice(0,10);
       var sp=obs[0]?obs[0].sputum:"无";var ur=obs[0]?obs[0].urine:"正常";
@@ -575,13 +585,13 @@
     } else if(tab==="trends"){
       html+='<div class="card"><h3>'+esc(p.name)+' · 每日趋势</h3>'+trendSvg(obs)+'<button class="ghost" id="exportTrend" style="margin-top:6px">导出趋势 CSV</button><p class="muted">只显示记录值，不做诊断；数据来自医生今日录入。</p></div>';
     } else if(tab==="meds"){
-      html+='<div class="card"><h3>用药方案 · '+esc(p.name)+'</h3><p class="muted">比赛演示，不写回 HIS；老人端/家人端只读。</p><div class="row2"><label>常用药<select id="planDrug"><option>氨氯地平</option><option>缬沙坦</option><option>美托洛尔</option><option>二甲双胍</option><option>阿卡波糖</option></select></label><label>剂量<input id="planDose" value="5mg"></label><label>频次<input id="planFreq" value="每日1次（早上）"></label><label>疗程<input id="planDuration" value="长期"></label><label>备注<input id="planNote" value="比赛演示"></label></div><button class="primary" id="savePlan" style="margin-top:8px">保存用药方案</button></div>'+
-        '<div class="card" style="margin-top:10px"><h3>已保存</h3><div class="list">'+(plans.map(function(x){return '<div class="item"><span><strong>'+esc(x.drug)+'</strong> '+esc(x.dose)+' · '+esc(x.frequency)+' · '+esc(x.duration)+'</span><span class="pill">'+esc(x.doctor)+'</span></div>'}).join("")||'<p class="muted">暂无用药方案。</p>')+'</div></div>';
+      html+=medCard;
     } else {
       html+='<div class="card"><h3>红线 / 告警</h3>'+(alerts.map(alertHTML).join("")||'<p>今日未出现红线。</p>')+'<p class="muted">医生端站内提醒；不能替代急诊。</p></div>';
     }
     $("#content").innerHTML=html;
     document.querySelectorAll("[data-p]").forEach(function(b){b.onclick=function(){selectDoctorPatient(b.dataset.p)}});
+    document.querySelectorAll("[data-goto-patients]").forEach(function(b){b.onclick=function(){tab="patients";renderShell()}});
     if($("#bindBtn"))$("#bindBtn").onclick=async function(){
       var pid=$("#bindPid").value.trim();if(!pid)return;
       try{var r=await apiFetch("/api/doctor/bind",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:pid})});var d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));toast("已绑定");selectedPatient=pid;await loadDoctorData();tab="profile";renderShell()}catch(e){toast("绑定失败："+e.message)}
@@ -595,7 +605,12 @@
     if($("#exportTrend"))$("#exportTrend").onclick=function(){var rows=(doctorDetail&&doctorDetail.observations)||[];var csv="日期,心率,上压,下压,呼吸,咳痰,排尿\n"+rows.map(function(x){return [x.observed_date,x.heart_rate,x.systolic,x.diastolic,x.respiratory_rate,x.sputum,x.urine].join(",")}).join("\n");var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="trend-"+selectedPatient+".csv";a.click();setTimeout(function(){URL.revokeObjectURL(a.href)},1000)};
     if($("#planDrug"))$("#planDrug").onchange=function(){var d={氨氯地平:"5mg",缬沙坦:"80mg",美托洛尔:"25mg",二甲双胍:"0.5g",阿卡波糖:"50mg"};$("#planDose").value=d[this.value]||""};
     if($("#savePlan"))$("#savePlan").onclick=async function(){
-      try{var r=await apiFetch("/api/doctor/med-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,drug:$("#planDrug").value,dose:$("#planDose").value,frequency:$("#planFreq").value,duration:$("#planDuration").value,note:$("#planNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorDetail();toast("用药方案已保存");renderShell()}catch(e){toast("保存失败："+e.message)}
+      if(!$("#confirmMed").checked){toast("请先核对：这是当前老人的药");return}
+      if(!p)return;
+      openModal("核对用药老人","<p>你即将给 <strong>"+esc(p.name)+"</strong>（ID: "+esc(p.id)+"）保存用药方案。</p><p>请确认不是另一位老人。</p><div class='call-row'><button class='primary' id='confirmMedYes'>确认保存</button></div>");
+      $("#confirmMedYes").onclick=async function(){
+        try{var r=await apiFetch("/api/doctor/med-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,confirm_patient_id:selectedPatient,drug:$("#planDrug").value,dose:$("#planDose").value,frequency:$("#planFreq").value,duration:$("#planDuration").value,note:$("#planNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);$("#modal").classList.add("hidden");await loadDoctorDetail();toast("用药方案已保存");renderShell()}catch(e){toast("保存失败："+e.message)}
+      };
     };
   }
 
