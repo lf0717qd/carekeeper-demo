@@ -76,6 +76,13 @@
   .setting-row{display:flex;align-items:center;gap:10px;margin:9px 0;flex-wrap:wrap}.setting-row label{min-width:60px;font-size:11px;color:var(--muted)}.setting-row input[type=range]{flex:1;min-width:120px}.setting-row select{max-width:260px;padding:7px;border:1px solid #cfdedb;border-radius:8px;font-size:12px;background:#fff}.setting-val{font-size:11px;color:var(--teal);min-width:44px;text-align:right}.offline-bar{background:#fff4e8;border-bottom:1px solid #efd8c3;color:#7a5438;padding:6px 14px;font-size:11px;text-align:center}.offline-bar.hidden{display:none}
   .speech-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#0f4c5c;color:#fff;border-radius:12px;padding:8px 11px;font-size:11px;display:flex;gap:8px;align-items:center;z-index:25;box-shadow:0 8px 24px rgba(15,76,92,.25)}.speech-bar.hidden{display:none}.speech-bar button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:3px 7px;font-size:10px;cursor:pointer}
   .muted{color:var(--muted);font-size:10px}
+  .book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .book{display:flex;flex-direction:column;align-items:flex-start;gap:3px;border:1px solid #cfdedb;background:linear-gradient(160deg,#fffdf8,#f4f9f7);border-radius:10px;padding:10px;text-align:left;cursor:pointer;color:#17363d}
+  .book strong{font-size:14px}.book span{font-size:10px;color:#52676a}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+  .row2 label{font-size:10px;color:#6b7b7d;display:flex;flex-direction:column;gap:3px}
+  .row2 input,.row2 select{border:1px solid #cfdedb;border-radius:7px;padding:7px;font:inherit;font-size:11px;background:#fff}
+  @media(max-width:760px){.row2{grid-template-columns:1fr}}
   .chat-card{padding:10px}
   .care-mini{background:#fff8ef;border:1px solid #efd8c3;border-radius:11px;padding:8px 10px;font-size:10px;line-height:1.55;color:#6b4a35}
   .care-mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;color:#7a4326;font-size:11px}
@@ -175,10 +182,13 @@
   var tab = "";
   var selectedPatient = "";
   var patients = {};
+  var doctorPatients = [];
+  var appObs = null;
+  var doctorDetail = null;
   var navs = {
     elder: [["home","今日"],["chat","同我讲"],["meds","用药"],["family","家人/医生"]],
     family: [["overview","今日报告"],["alerts","红线告警"],["meds","用药/复诊"],["doctor","医生摘要"],["consent","授权"]],
-    doctor: [["patients","我的老人"],["summary","只读摘要"],["alerts","告警"]]
+    doctor: [["patients","我的老人"],["profile","档案"],["observations","今日信息"],["trends","趋势"],["meds","用药方案"],["alerts","告警"]]
   };
   var state = {messages:[{role:"agent", text:"婆婆，你好，我系智能助手，唔系真人。你可以按下面讲，或者打字。"}]};
   var agentState = {};
@@ -267,6 +277,27 @@
     var d=await r.json();patients={};d.patients.forEach(function(p){patients[p.id]=p});
     var keys=Object.keys(patients);selectedPatient=keys[0]||"";
   }
+  async function loadDoctorData(){
+    try{
+      var r=await apiFetch("/api/doctor/patients");
+      if(!r.ok)return;
+      var d=await r.json();doctorPatients=d.patients||[];
+      if(!selectedPatient||!doctorPatients.some(function(x){return x.patient.id===selectedPatient})) selectedPatient=doctorPatients.length?doctorPatients[0].patient.id:"";
+      await loadDoctorDetail();
+    }catch(e){doctorPatients=[];doctorDetail=null;}
+  }
+  async function loadDoctorDetail(){
+    if(!selectedPatient){doctorDetail=null;return}
+    try{
+      var r=await apiFetch("/api/doctor/patient?patient_id="+encodeURIComponent(selectedPatient));
+      if(r.ok)doctorDetail=await r.json();
+    }catch(e){doctorDetail=null;}
+  }
+  async function selectDoctorPatient(id){selectedPatient=id;tab="profile";await loadDoctorDetail();renderShell()}
+  async function loadAppObservations(){
+    if(!selectedPatient)return;
+    try{var r=await apiFetch("/api/app/observations?patient_id="+encodeURIComponent(selectedPatient));if(r.ok)appObs=await r.json();}catch(e){appObs=null}
+  }
   async function login(){
     if(!role){$("#error").textContent="请先选择角色";return}
     $("#error").textContent="登录中…";
@@ -276,7 +307,7 @@
       if(!r.ok) throw new Error(d.error||"登录失败");
       token=d.token;role=d.role;userName=d.name;userSite=d.site||null;
       sessionStorage.setItem("ck_token",token);sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
-      await loadPatients();tab=navs[role][0][0];$("#error").textContent="";renderShell();
+      await loadPatients();if(role==="doctor")await loadDoctorData();else await loadAppObservations();tab=navs[role][0][0];$("#error").textContent="";renderShell();
     }catch(e){$("#error").textContent="登录失败："+e.message}
   }
   function logout(){
@@ -290,7 +321,7 @@
       var r=await apiFetch("/api/auth/me");
       if(!r.ok) throw new Error("session");
       var d=await r.json();role=d.role;userName=d.name;userSite=d.site||null;sessionStorage.setItem("ck_role",role);sessionStorage.setItem("ck_name",userName);
-      await loadPatients();tab=navs[role][0][0];renderShell();
+      await loadPatients();if(role==="doctor")await loadDoctorData();else await loadAppObservations();tab=navs[role][0][0];renderShell();
     }catch(e){token="";role="";sessionStorage.removeItem("ck_token");renderLogin()}
   }
 
@@ -313,6 +344,8 @@
     html+='<div class="elder-tabs">'+navs.elder.map(function(x){return '<button data-etab="'+x[0]+'" class="'+(x[0]===tab?'on':'')+'">'+x[1]+'</button>'}).join("")+'</div>';
     if(tab==="home"){
       html+='<div class="grid"><div class="card"><h3>今日照护</h3><div class="stat-row"><div class="stat"><b>'+p.bp+'</b><span>最近血压</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>1</b><span>待复诊</span></div></div></div><div class="card"><h3>我想讲</h3><button class="mic small" id="toChat">按一下讲嘢 / 打字</button></div></div>';
+      var latestObs=appObs&&appObs.observations&&appObs.observations[0];
+      if(latestObs)html+='<div class="card" style="margin-top:10px"><h3>今日身体（医生记录）</h3><div class="stat-row"><div class="stat"><b>'+latestObs.heart_rate+'</b><span>心率</span></div><div class="stat"><b>'+latestObs.systolic+'/'+latestObs.diastolic+'</b><span>血压</span></div><div class="stat"><b>'+latestObs.respiratory_rate+'</b><span>呼吸</span></div></div><p class="muted">咳痰：'+esc(latestObs.sputum)+' · 排尿：'+esc(latestObs.urine)+' · '+esc(latestObs.observed_date)+'</p></div>';
       html+='<div class="card" style="margin-top:10px"><h3>今日提醒</h3><div class="list"><div class="item"><span>早上药</span><span class="pill good">已完成</span></div><div class="item"><span>量血压</span><span class="pill">待复测</span></div><div class="item"><span>下周三复诊</span><span class="pill">已提醒</span></div></div></div>';
     } else if(tab==="chat"){
       html+='<div class="card chat-card">'+
@@ -448,6 +481,7 @@
       html+='<div class="card" style="margin-top:10px"><div style="background:linear-gradient(135deg,#0f4c5c,#1f6f7a);color:#fff9ef;border-radius:12px;padding:13px 15px"><div style="font-size:9px;letter-spacing:.12em;opacity:.8">FAMILY REPORT · '+today+'</div><h2 style="margin:4px 0;font-size:20px">'+esc(p.name)+'今日照护报告</h2><div style="font-size:10px;opacity:.85">乡音健康管家 · 粤语优先 · 自动汇总</div></div>'+
         '<div class="stat-row" style="margin-top:10px"><div class="stat"><b>'+p.bp+'</b><span>血压（最近）</span></div><div class="stat"><b>'+p.med+'</b><span>用药完成</span></div><div class="stat"><b>'+p.alerts.filter(function(a){return a.level==="high"}).length+'</b><span>红线告警</span></div></div>'+
         '<h3 style="margin-top:12px">今日摘要</h3><p>今日 3 次对话，已完成用药提醒与血压复测；'+(highCount?'出现 '+highCount+' 条红线，已提示就医。':'未出现红线。')+'</p>'+
+        '<h3 style="margin-top:10px">今日身体（医生记录）</h3>'+((appObs&&appObs.observations&&appObs.observations[0])?('<table style="width:100%;border-collapse:collapse;font-size:11px"><tbody><tr><td>心率</td><td>'+appObs.observations[0].heart_rate+' bpm</td></tr><tr><td>血压</td><td>'+appObs.observations[0].systolic+'/'+appObs.observations[0].diastolic+' mmHg</td></tr><tr><td>呼吸</td><td>'+appObs.observations[0].respiratory_rate+' 次/分</td></tr><tr><td>咳痰</td><td>'+esc(appObs.observations[0].sputum)+'</td></tr><tr><td>排尿</td><td>'+esc(appObs.observations[0].urine)+'</td></tr></tbody></table>'):'<p class="muted">医生还未录入今日信息。</p>')+
         '<h3 style="margin-top:10px">红线告警</h3>'+alertBlock+
         '<h3 style="margin-top:10px">复诊提醒</h3><p><strong>'+esc(p.follow)+'</strong><br>带：身份证、医保卡、血压记录；不需要空腹。</p>'+
         '<h3 style="margin-top:10px">在服药物（只读）</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;color:#6b7b7d;padding:4px">通用名</th><th style="text-align:left;color:#6b7b7d;padding:4px">规格</th><th style="text-align:left;color:#6b7b7d;padding:4px">用法</th></tr></thead><tbody><tr><td style="border-top:1px solid #e8f0ee;padding:4px">氨氯地平</td><td style="border-top:1px solid #e8f0ee;padding:4px">5mg</td><td style="border-top:1px solid #e8f0ee;padding:4px">早上饭后 · 每日 1 次</td></tr><tr><td style="border-top:1px solid #e8f0ee;padding:4px">二甲双胍</td><td style="border-top:1px solid #e8f0ee;padding:4px">0.5g</td><td style="border-top:1px solid #e8f0ee;padding:4px">早晚饭后 · 每日 2 次</td></tr></tbody></table>'+
@@ -476,13 +510,77 @@
     }
   }
 
+  function trendSvg(rows){
+    if(!rows.length)return '<p class="muted">暂无趋势数据。</p>';
+    var data=rows.slice(0,7).reverse(),w=640,h=190,pad=30,max=0,min=999;
+    data.forEach(function(x){[x.systolic,x.diastolic,x.heart_rate].forEach(function(v){if(v!=null){max=Math.max(max,v);min=Math.min(min,v)}})});
+    max=Math.max(max+10,120);min=Math.max(30,min-10);
+    function y(v){return h-pad-(v-min)/(max-min)*(h-pad*2)}
+    function line(key,color){var pts=data.map(function(x,i){var px=pad+i*(w-pad*2)/Math.max(1,data.length-1);return px.toFixed(1)+","+y(x[key]).toFixed(1)}).join(" ");return '<polyline fill="none" stroke="'+color+'" stroke-width="2.5" points="'+pts+'"/>'}
+    var labels=data.map(function(x,i){var px=pad+i*(w-pad*2)/Math.max(1,data.length-1);return '<text x="'+px+'" y="'+(h-8)+'" font-size="9" fill="#5f6f71" text-anchor="middle">'+esc(x.observed_date.slice(5))+'</text>'}).join("");
+    var dots=data.map(function(x,i){var px=pad+i*(w-pad*2)/Math.max(1,data.length-1);return '<circle cx="'+px+'" cy="'+y(x.systolic)+'" r="3" fill="#b23a2b"/>'}).join("");
+    return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto;background:#fff;border:1px solid #e8f0ee;border-radius:10px">'+
+      '<line x1="'+pad+'" y1="'+pad+'" x2="'+pad+'" y2="'+(h-pad)+'" stroke="#cfdedb"/>'+
+      '<line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#cfdedb"/>'+
+      line("systolic","#b23a2b")+line("diastolic","#0f4c5c")+line("heart_rate","#d99a2b")+dots+labels+
+      '<text x="'+pad+'" y="16" font-size="10" fill="#b23a2b">上压</text><text x="'+(pad+44)+'" y="16" font-size="10" fill="#0f4c5c">下压</text><text x="'+(pad+88)+'" y="16" font-size="10" fill="#d99a2b">心率</text></svg>';
+  }
+
   function renderDoctor(){
-    var p=patients[selectedPatient]||patients[Object.keys(patients)[0]];
-    var high=Object.keys(patients).filter(function(k){return patients[k].alerts.some(function(a){return a.level==="high"&&!a.handled})}).length;
-    var html='<div class="hero"><h2>医生端 · '+esc(userName)+'</h2><p>只读 · 不可开药 · 不可写回 HIS/EMR</p><div class="row"><span class="mini">我的老人：'+Object.keys(patients).length+'</span><span class="mini">高危：'+high+'</span><span class="mini">只看摘要</span></div></div>';
-    html+='<div class="doctor-row" style="margin-top:10px"><div class="card"><h3>我的老人</h3>'+Object.keys(patients).map(function(k){var x=patients[k];return '<div class="patient '+(k===selectedPatient?"on":"")+'" data-p="'+k+'"><strong>'+esc(x.name)+'</strong><br><span class="muted">'+x.age+'岁 · '+esc(x.area)+'</span></div>'}).join("")+'<p class="muted">演示数据；真实需 HIS/家医分配。</p></div><div class="card"><h3>'+esc(p.name)+' · 只读摘要</h3><p>诊断：'+esc(p.dx)+'</p><p>今日血压：'+esc(p.bp)+'；用药：'+esc(p.med)+'。</p><p>复诊：'+esc(p.follow)+'</p><h3 style="margin-top:10px">红线/告警</h3>'+(p.alerts.map(alertHTML).join("")||"<p>今日未出现红线。</p>")+'<div class="readonly">医生端只读；不可开处方/改病历/写回 HIS。告警为站内提醒。 <a href="care-loop.html">照护闭环</a></div></div></div>';
+    var item=doctorPatients.filter(function(x){return x.patient.id===selectedPatient})[0]||doctorPatients[0];
+    var p=item?item.patient:(patients[selectedPatient]||Object.values(patients)[0]);
+    if(item&&!selectedPatient)selectedPatient=item.patient.id;
+    var profile=(doctorDetail&&doctorDetail.profile)||(item&&item.profile)||{};
+    var obs=(doctorDetail&&doctorDetail.observations)||[];
+    var plans=(doctorDetail&&doctorDetail.med_plans)||[];
+    var alerts=(p&&p.alerts)||[];
+    var high=alerts.filter(function(a){return a.level==="high"&&!a.handled}).length;
+    var html='<div class="hero"><h2>医生端 · '+esc(userName||"李医生")+'</h2><p>我的老人 · 今日信息 · 趋势 · 用药方案</p><div class="row"><span class="mini">我的老人：'+doctorPatients.length+'</span><span class="mini">高危：'+high+'</span><span class="mini">比赛演示</span></div></div>';
+    if(!doctorPatients.length){
+      html+='<div class="card"><h3>我的老人</h3><p class="muted">还没有绑定老人。后台创建老人账号后，在这里输入老人 ID 绑定。</p><div class="chat-input"><input id="bindPid" placeholder="老人 ID，例如 wang"><button class="primary" id="bindBtn">绑定</button></div></div>';
+    } else if(tab==="patients"){
+      var groups={};doctorPatients.forEach(function(x){var f=(x.profile&&x.profile.folder)||"未分类";(groups[f]=groups[f]||[]).push(x)});
+      html+='<div class="card"><h3>绑定老人</h3><p class="muted">一个老人只能绑定一个医生；已绑定其他医生会提示。</p><div class="chat-input"><input id="bindPid" placeholder="老人 ID，例如 wang"><button class="primary" id="bindBtn">绑定</button></div></div>';
+      Object.keys(groups).forEach(function(folder){
+        html+='<div class="card" style="margin-top:10px"><h3>📁 '+esc(folder)+'</h3><div class="book-grid">'+groups[folder].map(function(x){
+          var q=x.patient;return '<button class="book" data-p="'+esc(q.id)+'"><strong>'+esc(q.name)+'</strong><span>'+q.age+'岁 · '+esc(q.area)+'</span><span class="muted">'+(x.latest?('最近 '+esc(x.latest.observed_date)+' · '+x.latest.systolic+'/'+x.latest.diastolic):'还没有今日信息')+'</span></button>'
+        }).join("")+'</div></div>';
+      });
+    } else if(!p){
+      html+='<div class="card"><h3>请先绑定老人</h3></div>';
+    } else if(tab==="profile"){
+      html+='<div class="card"><h3>'+esc(p.name)+' · 档案</h3><p class="muted">'+p.age+'岁 · '+esc(p.area)+' · '+esc(p.dx)+'</p>'+
+        '<div class="row2"><label>病种文件夹<input id="pfFolder" value="'+esc(profile.folder||"")+'" placeholder="高血压/糖尿病"></label><label>诊断<input id="pfDx" value="'+esc(profile.diagnosis||p.dx||"")+'"></label><label>过敏<input id="pfAllergy" value="'+esc(profile.allergies||"")+'" placeholder="无/青霉素"></label><label>备注<input id="pfNote" value="'+esc(profile.note||"")+'"></label></div>'+
+        '<button class="primary" id="saveProfile" style="margin-top:8px">保存档案</button><p class="muted">修改会同步到老人端/家人端；只读端不能改。</p></div>';
+    } else if(tab==="observations"){
+      var today=new Date().toISOString().slice(0,10);
+      html+='<div class="card"><h3>今日信息 · '+esc(p.name)+'</h3><p class="muted">晨间护理：心率、血压、呼吸、咳痰、排尿。</p>'+
+        '<div class="row2"><label>日期<input id="obsDate" type="date" value="'+today+'"></label><label>心率 bpm<input id="obsHr" type="number" value="'+(obs[0]?obs[0].heart_rate:80)+'"></label><label>上压<input id="obsSys" type="number" value="'+(obs[0]?obs[0].systolic:140)+'"></label><label>下压<input id="obsDia" type="number" value="'+(obs[0]?obs[0].diastolic:85)+'"></label><label>呼吸 次/分<input id="obsRr" type="number" value="'+(obs[0]?obs[0].respiratory_rate:18)+'"></label><label>咳痰<select id="obsSputum"><option>无</option><option>有</option></select></label><label>排尿<select id="obsUrine"><option>正常</option><option>减少</option><option>困难</option><option>失禁</option></select></label><label>备注<input id="obsNote" value="'+(obs[0]?esc(obs[0].note||""):"")+'"></label></div>'+
+        '<button class="primary" id="saveObs" style="margin-top:8px">保存今日信息</button><p class="muted">保存后老人端/家人端立即可见。</p></div>'+
+        '<div class="card" style="margin-top:10px"><h3>最近记录</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>日期</th><th>心率</th><th>血压</th><th>呼吸</th><th>咳痰</th><th>排尿</th></tr></thead><tbody>'+(obs.slice(0,7).map(function(x){return '<tr><td>'+esc(x.observed_date)+'</td><td>'+x.heart_rate+'</td><td>'+x.systolic+'/'+x.diastolic+'</td><td>'+x.respiratory_rate+'</td><td>'+esc(x.sputum)+'</td><td>'+esc(x.urine)+'</td></tr>'}).join("")||'<tr><td colspan="6">暂无</td></tr>')+'</tbody></table></div>';
+    } else if(tab==="trends"){
+      html+='<div class="card"><h3>'+esc(p.name)+' · 每日趋势</h3>'+trendSvg(obs)+'<p class="muted">只显示记录值，不做诊断；数据来自医生今日录入。</p></div>';
+    } else if(tab==="meds"){
+      html+='<div class="card"><h3>用药方案 · '+esc(p.name)+'</h3><p class="muted">比赛演示，不写回 HIS；老人端/家人端只读。</p><div class="row2"><label>常用药<select id="planDrug"><option>氨氯地平</option><option>缬沙坦</option><option>美托洛尔</option><option>二甲双胍</option><option>阿卡波糖</option></select></label><label>剂量<input id="planDose" value="5mg"></label><label>频次<input id="planFreq" value="每日1次（早上）"></label><label>疗程<input id="planDuration" value="长期"></label><label>备注<input id="planNote" value="比赛演示"></label></div><button class="primary" id="savePlan" style="margin-top:8px">保存用药方案</button></div>'+
+        '<div class="card" style="margin-top:10px"><h3>已保存</h3><div class="list">'+(plans.map(function(x){return '<div class="item"><span><strong>'+esc(x.drug)+'</strong> '+esc(x.dose)+' · '+esc(x.frequency)+' · '+esc(x.duration)+'</span><span class="pill">'+esc(x.doctor)+'</span></div>'}).join("")||'<p class="muted">暂无用药方案。</p>')+'</div></div>';
+    } else {
+      html+='<div class="card"><h3>红线 / 告警</h3>'+(alerts.map(alertHTML).join("")||'<p>今日未出现红线。</p>')+'<p class="muted">医生端站内提醒；不能替代急诊。</p></div>';
+    }
     $("#content").innerHTML=html;
-    document.querySelectorAll("[data-p]").forEach(function(b){b.onclick=function(){selectedPatient=b.dataset.p;renderShell()}});
+    document.querySelectorAll("[data-p]").forEach(function(b){b.onclick=function(){selectDoctorPatient(b.dataset.p)}});
+    if($("#bindBtn"))$("#bindBtn").onclick=async function(){
+      var pid=$("#bindPid").value.trim();if(!pid)return;
+      try{var r=await apiFetch("/api/doctor/bind",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:pid})});var d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));toast("已绑定");selectedPatient=pid;await loadDoctorData();tab="profile";renderShell()}catch(e){toast("绑定失败："+e.message)}
+    };
+    if($("#saveProfile"))$("#saveProfile").onclick=async function(){
+      try{var r=await apiFetch("/api/doctor/profile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,folder:$("#pfFolder").value,diagnosis:$("#pfDx").value,allergies:$("#pfAllergy").value,note:$("#pfNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorData();toast("档案已保存");renderShell()}catch(e){toast("保存失败："+e.message)}
+    };
+    if($("#saveObs"))$("#saveObs").onclick=async function(){
+      try{var r=await apiFetch("/api/doctor/observations",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,observed_date:$("#obsDate").value,heart_rate:Number($("#obsHr").value),systolic:Number($("#obsSys").value),diastolic:Number($("#obsDia").value),respiratory_rate:Number($("#obsRr").value),sputum:$("#obsSputum").value,urine:$("#obsUrine").value,note:$("#obsNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorDetail();toast("今日信息已同步");renderShell()}catch(e){toast("保存失败："+e.message)}
+    };
+    if($("#savePlan"))$("#savePlan").onclick=async function(){
+      try{var r=await apiFetch("/api/doctor/med-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({patient_id:selectedPatient,drug:$("#planDrug").value,dose:$("#planDose").value,frequency:$("#planFreq").value,duration:$("#planDuration").value,note:$("#planNote").value})});if(!r.ok)throw new Error("HTTP "+r.status);await loadDoctorDetail();toast("用药方案已保存");renderShell()}catch(e){toast("保存失败："+e.message)}
+    };
   }
 
   $("#roles").addEventListener("click",function(){});
